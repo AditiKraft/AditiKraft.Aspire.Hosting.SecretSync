@@ -67,6 +67,33 @@ if (secretSync.GetValue("Enabled", false))
 }
 ```
 
+## Modes
+
+`PullMode`:
+
+- `Always`: checks remote manifest and pulls latest data on startup.
+- `IfStale`: skips remote check when local baseline is still fresh (`StaleAfter` window).
+- `Manual`: does not pull or push remote data automatically.
+
+`VersionMode`:
+
+- `Latest`: tracks the latest manifest revision.
+- `Pinned`: loads only `PinnedRevision` (read-only mode for synced values).
+
+`ConflictMode`:
+
+- `Fail`
+- `PullWins`
+- `PushWins`
+- `MergeNonOverlapping`
+
+## API
+
+- `AddSecretSync(...)` / `AddSecretSyncAsync(...)`
+- `MapAppHostSecrets(resourceName)`
+- `MapProjectUserSecrets<TProject>(resourceName)`
+- `MapProjectUserSecrets(resourceName, projectPath)`
+
 ## Notes
 
 - `SecretSync` is control config only and is not synced as app secret data.

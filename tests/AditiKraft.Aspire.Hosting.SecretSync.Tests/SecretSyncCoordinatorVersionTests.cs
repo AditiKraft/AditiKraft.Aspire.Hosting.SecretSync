@@ -108,7 +108,7 @@ public sealed class SecretSyncCoordinatorVersionTests : IDisposable
         ISecretSyncProvider provider,
         AesGcmSecretEncryptor encryptor)
     {
-        var handle = new SecretSyncHandle(options);
+        var handle = new SecretSyncHandle();
         var userSecretsStore = new UserSecretsStore(options);
         var projectStore = new ProjectUserSecretsStore(options, userSecretsStore);
         var stateStore = new SecretSyncStateStore(options);

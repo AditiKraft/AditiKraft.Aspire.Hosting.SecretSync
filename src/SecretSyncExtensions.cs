@@ -7,7 +7,6 @@ using AditiKraft.Aspire.Hosting.SecretSync.Providers;
 using AditiKraft.Aspire.Hosting.SecretSync.State;
 using AditiKraft.Aspire.Hosting.SecretSync.UserSecrets;
 using Aspire.Hosting;
-using Aspire.Hosting.ApplicationModel;
 using Microsoft.Extensions.Configuration.UserSecrets;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -35,8 +34,8 @@ public static class SecretSyncExtensions
         configure(options);
         ResolveAppHostDefaults(builder, options);
 
-        var handle = new SecretSyncHandle(options);
-        ISecretSyncProvider provider = CreateProvider(options);
+        var handle = new SecretSyncHandle();
+        ISecretSyncProvider provider = new R2SecretSyncProvider();
         var encryptor = new AesGcmSecretEncryptor(options);
         var userSecretsStore = new UserSecretsStore(options);
         var projectUserSecretsStore = new ProjectUserSecretsStore(options, userSecretsStore);
@@ -79,79 +78,6 @@ public static class SecretSyncExtensions
         });
 
         return handle;
-    }
-
-    public static IResourceBuilder<T> WithSecretSync<T>(
-        this IResourceBuilder<T> builder,
-        SecretSyncHandle secrets,
-        IEnumerable<string>? resourceNames = null,
-        bool includeResourceMatchingName = true)
-        where T : IResourceWithEnvironment
-    {
-        ArgumentNullException.ThrowIfNull(builder);
-        ArgumentNullException.ThrowIfNull(secrets);
-
-        IReadOnlyDictionary<string, string?> values = secrets.ResolveForResource(
-            builder.Resource.Name,
-            resourceNames,
-            includeResourceMatchingName);
-
-        foreach ((string key, string? value) in values)
-        {
-            if (value is not null)
-            {
-                builder.WithEnvironment(ToEnvironmentName(key), value);
-            }
-        }
-
-        return builder;
-    }
-
-    public static IResourceBuilder<T> WithSecretSyncValue<T>(
-        this IResourceBuilder<T> builder,
-        SecretSyncHandle secrets,
-        string configurationPath,
-        string? environmentVariableName = null,
-        string? resourceName = null)
-        where T : IResourceWithEnvironment
-    {
-        ArgumentNullException.ThrowIfNull(builder);
-        ArgumentNullException.ThrowIfNull(secrets);
-        ArgumentException.ThrowIfNullOrWhiteSpace(configurationPath);
-
-        string? value = null;
-        string resolvedResourceName = string.IsNullOrWhiteSpace(resourceName)
-            ? builder.Resource.Name
-            : resourceName;
-        if (secrets.Resources.TryGetValue(resolvedResourceName, out IReadOnlyDictionary<string, string?>? resourceValues))
-        {
-            resourceValues.TryGetValue(configurationPath, out value);
-        }
-
-        if (value is null)
-        {
-            if (secrets.Options.MissingResourceBehavior == SecretSyncMissingResourceBehavior.Fail)
-            {
-                throw new InvalidOperationException($"SecretSync value '{configurationPath}' was not found for resource '{resolvedResourceName}'.");
-            }
-
-            return builder;
-        }
-
-        builder.WithEnvironment(environmentVariableName ?? ToEnvironmentName(configurationPath), value);
-        return builder;
-    }
-
-    private static string ToEnvironmentName(string configurationPath) =>
-        configurationPath.Replace(":", "__", StringComparison.Ordinal);
-
-    private static ISecretSyncProvider CreateProvider(SecretSyncOptions options)
-    {
-        return options.Provider switch
-        {
-            SecretSyncProvider.CloudflareR2 => new R2SecretSyncProvider(),
-            _ => throw new NotSupportedException($"SecretSync provider '{options.Provider}' is not supported yet.")
-        };
     }
 
     private static void ResolveAppHostDefaults(IDistributedApplicationBuilder builder, SecretSyncOptions options)

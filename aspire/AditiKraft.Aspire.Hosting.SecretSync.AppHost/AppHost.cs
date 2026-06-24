@@ -10,7 +10,6 @@ if (secretSync.GetValue("Enabled", false))
 
     await builder.AddSecretSyncAsync(options =>
     {
-        options.Provider = SecretSyncProvider.CloudflareR2;
         options.BucketName = secretSync["BucketName"] ?? "";
         options.ObjectKey = secretSync["ObjectKey"] ?? "";
         options.EncryptionKey = secretSync["EncryptionKey"] ?? "";

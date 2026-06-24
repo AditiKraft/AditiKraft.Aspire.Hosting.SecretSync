@@ -4,7 +4,6 @@ namespace AditiKraft.Aspire.Hosting.SecretSync;
 
 public sealed class SecretSyncOptions
 {
-    public SecretSyncProvider Provider { get; set; } = SecretSyncProvider.CloudflareR2;
     public string BucketName { get; set; } = "";
     public string ObjectKey { get; set; } = "";
     public string EncryptionKey { get; set; } = "";
@@ -20,7 +19,6 @@ public sealed class SecretSyncOptions
     public bool WriteToUserSecrets { get; set; }
     public bool ReadFromUserSecrets { get; set; } = true;
     public bool InitializeIfMissing { get; set; } = true;
-    public bool PushOnStartupWhenLocalIsNewer { get; set; }
     public bool FailWhenRemoteMissingAndLocalEmpty { get; set; } = true;
 
     public string UserSecretsId { get; set; } = "";
@@ -30,17 +28,12 @@ public sealed class SecretSyncOptions
     public IList<ProjectUserSecretsSource> ProjectUserSecretsSources { get; } = [];
 
     public SecretSyncConflictMode ConflictMode { get; set; } = SecretSyncConflictMode.Fail;
-    public SecretSyncMissingResourceBehavior MissingResourceBehavior { get; set; } =
-        SecretSyncMissingResourceBehavior.Ignore;
     public SecretSyncPrecedence ConfigurationPrecedence { get; set; } =
         SecretSyncPrecedence.BelowEnvironmentAndCommandLine;
 
-    public TimeSpan StartupTimeout { get; set; } = TimeSpan.FromSeconds(30);
     public TimeSpan ShutdownTimeout { get; set; } = TimeSpan.FromSeconds(15);
 
     public Argon2idOptions KeyDerivation { get; } = new();
-
-    public Func<SecretSyncConflictContext, CancellationToken, ValueTask<SecretSyncConflictDecision>>? ConflictResolver { get; set; }
 
     public SecretSyncOptions MapAppHostSecrets(string resourceName = "apphost")
     {
@@ -72,12 +65,6 @@ public sealed class SecretSyncOptions
 
 public sealed record ProjectUserSecretsSource(string ResourceName, string ProjectPath);
 
-public enum SecretSyncProvider
-{
-    CloudflareR2,
-    Custom
-}
-
 public enum SecretSyncConflictMode
 {
     Fail,
@@ -91,13 +78,6 @@ public enum SecretSyncPrecedence
     Highest,
     BelowEnvironmentAndCommandLine,
     Lowest
-}
-
-public enum SecretSyncMissingResourceBehavior
-{
-    Ignore,
-    Warn,
-    Fail
 }
 
 public enum SecretSyncPullMode
