@@ -94,6 +94,7 @@ internal sealed class UserSecretsStore(SecretSyncOptions options)
 
     public async Task MergeVaultAsync(
         SecretSyncVault vault,
+        IReadOnlyDictionary<string, string> baselineHashes,
         CancellationToken cancellationToken)
     {
         if (!options.WriteToUserSecrets)
@@ -122,7 +123,7 @@ internal sealed class UserSecretsStore(SecretSyncOptions options)
             }
         }
 
-        UserSecretsMaterializer.Materialize(current, appHostValues);
+        UserSecretsMaterializer.Materialize(current, appHostValues, baselineHashes);
         await WritePathAsync(path, current, cancellationToken);
     }
 

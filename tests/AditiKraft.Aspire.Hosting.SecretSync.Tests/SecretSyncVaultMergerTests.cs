@@ -55,7 +55,7 @@ public sealed class SecretSyncVaultMergerTests
     }
 
     [Fact]
-    public void MergeRemoteWithLocal_AllowsLocalEditWhenRemoteStillMatchesMaterializedBaseline()
+    public void MergeRemoteWithLocal_AllowsLocalEditWhenRemoteStillMatchesBaseline()
     {
         var remote = new SecretSyncVault
         {

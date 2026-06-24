@@ -4,6 +4,7 @@ using AditiKraft.Aspire.Hosting.SecretSync.Configuration;
 using AditiKraft.Aspire.Hosting.SecretSync.Cryptography;
 using AditiKraft.Aspire.Hosting.SecretSync.Lifecycle;
 using AditiKraft.Aspire.Hosting.SecretSync.Providers;
+using AditiKraft.Aspire.Hosting.SecretSync.State;
 using AditiKraft.Aspire.Hosting.SecretSync.UserSecrets;
 using Aspire.Hosting;
 using Aspire.Hosting.ApplicationModel;
@@ -39,7 +40,8 @@ public static class SecretSyncExtensions
         var encryptor = new AesGcmSecretEncryptor(options);
         var userSecretsStore = new UserSecretsStore(options);
         var projectUserSecretsStore = new ProjectUserSecretsStore(options, userSecretsStore);
-        var snapshotBuilder = new SecretSnapshotBuilder(options, userSecretsStore, projectUserSecretsStore);
+        var stateStore = new SecretSyncStateStore(options);
+        var snapshotBuilder = new SecretSnapshotBuilder(options, userSecretsStore, projectUserSecretsStore, stateStore);
         var coordinator = new SecretSyncCoordinator(
             options,
             handle,
@@ -47,7 +49,8 @@ public static class SecretSyncExtensions
             encryptor,
             snapshotBuilder,
             userSecretsStore,
-            projectUserSecretsStore);
+            projectUserSecretsStore,
+            stateStore);
 
         await coordinator.PullAsync(builder.Configuration, cancellationToken);
 
@@ -57,6 +60,7 @@ public static class SecretSyncExtensions
         builder.Services.AddSingleton(encryptor);
         builder.Services.AddSingleton(userSecretsStore);
         builder.Services.AddSingleton(projectUserSecretsStore);
+        builder.Services.AddSingleton(stateStore);
         builder.Services.AddSingleton(snapshotBuilder);
         builder.Services.AddSingleton(coordinator);
         builder.Services.AddHostedService<SecretSyncShutdownHostedService>();

@@ -1,6 +1,7 @@
 using AditiKraft.Aspire.Hosting.SecretSync.Abstractions;
 using AditiKraft.Aspire.Hosting.SecretSync.Configuration;
 using AditiKraft.Aspire.Hosting.SecretSync.Cryptography;
+using AditiKraft.Aspire.Hosting.SecretSync.State;
 using AditiKraft.Aspire.Hosting.SecretSync.UserSecrets;
 using Microsoft.Extensions.Configuration;
 
@@ -13,7 +14,8 @@ internal sealed class SecretSyncCoordinator(
     AesGcmSecretEncryptor encryptor,
     SecretSnapshotBuilder snapshotBuilder,
     UserSecretsStore userSecretsStore,
-    ProjectUserSecretsStore projectUserSecretsStore)
+    ProjectUserSecretsStore projectUserSecretsStore,
+    SecretSyncStateStore stateStore)
 {
     public async Task PullAsync(IConfiguration configuration, CancellationToken cancellationToken)
     {
@@ -168,14 +170,18 @@ internal sealed class SecretSyncCoordinator(
         SecretSyncVault vault,
         CancellationToken cancellationToken)
     {
+        SecretSyncState state = await stateStore.ReadAsync(cancellationToken);
+
         if (options.WriteToUserSecrets)
         {
             await userSecretsStore.MergeVaultAsync(
                 vault,
+                state.GetResourceHashes(options.AppHostResourceName),
                 cancellationToken);
         }
 
-        await projectUserSecretsStore.MergeVaultAsync(vault, cancellationToken);
+        await projectUserSecretsStore.MergeVaultAsync(vault, state, cancellationToken);
+        await stateStore.SaveVaultBaselineAsync(vault, cancellationToken);
     }
 
     private SecretSyncProviderContext CreateContext() =>

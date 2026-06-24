@@ -201,7 +201,7 @@ builder.AddContainer("toolbox", "example/toolbox")
 | API project user-secrets outside `SecretSync` | `resources.api` |
 | Web project user-secrets outside `SecretSync` | `resources.web` |
 
-Keys beginning with `SecretSync:` are reserved for SecretSync bootstrap and materialization metadata. They are ignored when building resource data.
+Keys beginning with `SecretSync:` are reserved for SecretSync bootstrap/control data and are ignored when building resource data.
 
 ## New Machine Flow
 
@@ -260,13 +260,13 @@ If the remote object does not exist:
 
 ## Conflict Behavior
 
-SecretSync writes hidden metadata keys such as:
+SecretSync keeps local baseline hashes in an internal state file, not in `secrets.json`.
 
 ```text
-SecretSync:Materialized:{encoded-key}:Sha256
+%LOCALAPPDATA%\AditiKraft\Aspire\SecretSync\{apphost-identity}\{object-key-hash}\state.json
 ```
 
-These metadata values do not contain plaintext secrets. They let SecretSync distinguish "unchanged value that was pulled from R2" from "developer intentionally edited this value locally."
+The state file stores SHA-256 hashes of the last materialized values by resource and key. It does not store plaintext secrets. This lets SecretSync distinguish "unchanged value that was pulled from R2" from "developer intentionally edited this value locally" while keeping AppHost/API/Web user-secrets files clean.
 
 Scenarios:
 
@@ -374,6 +374,9 @@ src/
     SecretSyncShutdownHostedService.cs
   Providers/
     R2SecretSyncProvider.cs
+  State/
+    SecretSyncState.cs
+    SecretSyncStateStore.cs
   UserSecrets/
     ProjectUserSecretsResolver.cs
     ProjectUserSecretsStore.cs

@@ -1,5 +1,6 @@
 using System.Text.Json.Nodes;
 using AditiKraft.Aspire.Hosting.SecretSync.Configuration;
+using AditiKraft.Aspire.Hosting.SecretSync.State;
 using AditiKraft.Aspire.Hosting.SecretSync.UserSecrets;
 using Microsoft.Extensions.Configuration.UserSecrets;
 
@@ -39,7 +40,8 @@ public sealed class ProjectUserSecretsStoreTests : IDisposable
             }
         };
 
-        await projectStore.MergeVaultAsync(vault, CancellationToken.None);
+        var emptyState = new SecretSyncState();
+        await projectStore.MergeVaultAsync(vault, emptyState, CancellationToken.None);
 
         IReadOnlyDictionary<string, string?> values =
             await userSecretsStore.ReadAsync(userSecretsId, CancellationToken.None);
@@ -48,9 +50,11 @@ public sealed class ProjectUserSecretsStoreTests : IDisposable
         Assert.Equal("api", values["Stripe:Mode"]);
         Assert.False(values.ContainsKey("Parameters:postgres-password"));
         Assert.DoesNotContain("sk-web", values.Values);
-        Assert.Contains(values.Keys, key => key.StartsWith("SecretSync:Materialized:", StringComparison.Ordinal));
 
-        ProjectUserSecretsReadResult read = await projectStore.ReadResourceChangesAsync(CancellationToken.None);
+        SecretSyncState baselineState = CreateState(vault);
+        ProjectUserSecretsReadResult read = await projectStore.ReadResourceChangesAsync(
+            baselineState,
+            CancellationToken.None);
 
         Assert.True(read.Resources.TryGetValue("api", out Dictionary<string, string?>? apiResource));
         Assert.Empty(apiResource);
@@ -61,7 +65,9 @@ public sealed class ProjectUserSecretsStoreTests : IDisposable
             overwriteExisting: true,
             CancellationToken.None);
 
-        read = await projectStore.ReadResourceChangesAsync(CancellationToken.None);
+        read = await projectStore.ReadResourceChangesAsync(
+            baselineState,
+            CancellationToken.None);
 
         Assert.Equal("sk-api-local-edit", read.Resources["api"]["Stripe:ApiKey"]);
         Assert.Single(read.Edits);
@@ -105,5 +111,23 @@ public sealed class ProjectUserSecretsStoreTests : IDisposable
         {
             _secretDirectories.Add(directory);
         }
+    }
+
+    private static SecretSyncState CreateState(SecretSyncVault vault)
+    {
+        var state = new SecretSyncState();
+
+        foreach ((string resourceName, JsonObject resource) in vault.Resources)
+        {
+            var hashes = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            foreach ((string key, string? value) in VaultFlattener.Flatten(resource))
+            {
+                hashes[key] = SecretValueHasher.Hash(value);
+            }
+
+            state.Resources[resourceName] = hashes;
+        }
+
+        return state;
     }
 }

@@ -8,4 +8,4 @@ internal sealed record SecretSyncLocalEdit(
     string ResourceName,
     string Key,
     string? Value,
-    string? MaterializedHash);
+    string? BaselineHash);

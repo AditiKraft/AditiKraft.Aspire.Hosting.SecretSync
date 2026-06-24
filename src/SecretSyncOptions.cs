@@ -22,6 +22,7 @@ public sealed class SecretSyncOptions
     public string UserSecretsId { get; set; } = "";
     public string ProjectId { get; set; } = "";
     public string AppHostResourceName { get; set; } = "apphost";
+    public string StateDirectory { get; set; } = "";
     public IList<ProjectUserSecretsSource> ProjectUserSecretsSources { get; } = [];
 
     public SecretSyncConflictMode ConflictMode { get; set; } = SecretSyncConflictMode.Fail;

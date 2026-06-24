@@ -127,13 +127,13 @@ internal static class SecretSyncVaultMerger
         IReadOnlyDictionary<string, SecretSyncLocalEdit> localEditIndex)
     {
         if (!localEditIndex.TryGetValue(CreateLocalEditIndexKey(resourceName, key), out SecretSyncLocalEdit? edit) ||
-            string.IsNullOrWhiteSpace(edit.MaterializedHash))
+            string.IsNullOrWhiteSpace(edit.BaselineHash))
         {
             return false;
         }
 
         return string.Equals(
-            edit.MaterializedHash,
+            edit.BaselineHash,
             SecretValueHasher.Hash(remoteValue),
             StringComparison.Ordinal);
     }

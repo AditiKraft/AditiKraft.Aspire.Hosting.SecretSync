@@ -1,11 +1,13 @@
 using AditiKraft.Aspire.Hosting.SecretSync.UserSecrets;
+using AditiKraft.Aspire.Hosting.SecretSync.State;
 
 namespace AditiKraft.Aspire.Hosting.SecretSync.Configuration;
 
 internal sealed class SecretSnapshotBuilder(
     SecretSyncOptions options,
     UserSecretsStore userSecretsStore,
-    ProjectUserSecretsStore projectUserSecretsStore)
+    ProjectUserSecretsStore projectUserSecretsStore,
+    SecretSyncStateStore stateStore)
 {
     public async Task<SecretSyncVault> BuildLocalVaultAsync(CancellationToken cancellationToken)
     {
@@ -22,13 +24,15 @@ internal sealed class SecretSnapshotBuilder(
 
         var vault = new SecretSyncVault();
         var edits = new List<SecretSyncLocalEdit>();
+        SecretSyncState state = await stateStore.ReadAsync(cancellationToken);
 
         if (options.ReadFromUserSecrets)
         {
             IReadOnlyDictionary<string, string?> secrets = await userSecretsStore.ReadAsync(cancellationToken);
             UserSecretsReadResult appHost = UserSecretsMaterializer.ReadResource(
                 options.AppHostResourceName,
-                secrets);
+                secrets,
+                state.GetResourceHashes(options.AppHostResourceName));
 
             if (appHost.Resource.Count > 0)
             {
@@ -39,7 +43,7 @@ internal sealed class SecretSnapshotBuilder(
         }
 
         ProjectUserSecretsReadResult projectSecrets =
-            await projectUserSecretsStore.ReadResourceChangesAsync(cancellationToken);
+            await projectUserSecretsStore.ReadResourceChangesAsync(state, cancellationToken);
         foreach ((string resourceName, Dictionary<string, string?> values) in projectSecrets.Resources)
         {
             if (vault.Resources.TryGetValue(resourceName, out System.Text.Json.Nodes.JsonObject? existing))

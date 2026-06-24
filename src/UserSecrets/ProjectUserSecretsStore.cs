@@ -1,4 +1,5 @@
 using AditiKraft.Aspire.Hosting.SecretSync.Configuration;
+using AditiKraft.Aspire.Hosting.SecretSync.State;
 
 namespace AditiKraft.Aspire.Hosting.SecretSync.UserSecrets;
 
@@ -7,6 +8,7 @@ internal sealed class ProjectUserSecretsStore(
     UserSecretsStore userSecretsStore)
 {
     public async Task<ProjectUserSecretsReadResult> ReadResourceChangesAsync(
+        SecretSyncState state,
         CancellationToken cancellationToken)
     {
         var resources = new Dictionary<string, Dictionary<string, string?>>(StringComparer.OrdinalIgnoreCase);
@@ -16,7 +18,10 @@ internal sealed class ProjectUserSecretsStore(
         {
             string userSecretsId = ProjectUserSecretsResolver.GetRequiredUserSecretsId(source.ProjectPath);
             IReadOnlyDictionary<string, string?> values = await userSecretsStore.ReadAsync(userSecretsId, cancellationToken);
-            UserSecretsReadResult result = UserSecretsMaterializer.ReadResource(source.ResourceName, values);
+            UserSecretsReadResult result = UserSecretsMaterializer.ReadResource(
+                source.ResourceName,
+                values,
+                state.GetResourceHashes(source.ResourceName));
 
             if (!resources.TryGetValue(source.ResourceName, out Dictionary<string, string?>? resourceValues))
             {
@@ -35,7 +40,10 @@ internal sealed class ProjectUserSecretsStore(
         return new ProjectUserSecretsReadResult(resources, edits);
     }
 
-    public async Task MergeVaultAsync(SecretSyncVault vault, CancellationToken cancellationToken)
+    public async Task MergeVaultAsync(
+        SecretSyncVault vault,
+        SecretSyncState state,
+        CancellationToken cancellationToken)
     {
         foreach (ProjectUserSecretsSource source in options.ProjectUserSecretsSources)
         {
@@ -55,7 +63,10 @@ internal sealed class ProjectUserSecretsStore(
                 }
             }
 
-            UserSecretsMaterializer.Materialize(current, resourceValues);
+            UserSecretsMaterializer.Materialize(
+                current,
+                resourceValues,
+                state.GetResourceHashes(source.ResourceName));
             await userSecretsStore.WriteAsync(userSecretsId, current, cancellationToken);
         }
     }
