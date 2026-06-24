@@ -14,7 +14,7 @@ public sealed class SecretSyncOptions
     public SecretSyncVersionMode VersionMode { get; set; } = SecretSyncVersionMode.Latest;
     public string PinnedRevision { get; set; } = "";
 
-    public R2SecretSyncOptions R2 { get; } = new();
+    public S3SecretSyncOptions S3 { get; } = new();
 
     public bool WriteToUserSecrets { get; set; }
     public bool ReadFromUserSecrets { get; set; } = true;
@@ -93,12 +93,12 @@ public enum SecretSyncVersionMode
     Pinned
 }
 
-public sealed class R2SecretSyncOptions
+public sealed class S3SecretSyncOptions
 {
     public string Endpoint { get; set; } = "";
     public string AccessKeyId { get; set; } = "";
     public string SecretAccessKey { get; set; } = "";
-    public string Region { get; set; } = "auto";
+    public string Region { get; set; } = "us-east-1";
     public bool ForcePathStyle { get; set; } = true;
     public bool DisablePayloadSigning { get; set; } = true;
     public bool DisableDefaultChecksumValidation { get; set; } = true;

@@ -1,6 +1,6 @@
 # AditiKraft.Aspire.Hosting.SecretSync
 
-Encrypted secret sync for .NET Aspire AppHost and mapped project user-secrets.
+Encrypted secret sync for .NET Aspire AppHost and mapped project user-secrets using S3-compatible storage.
 
 [![NuGet](https://img.shields.io/nuget/v/AditiKraft.Aspire.Hosting.SecretSync.svg)](https://www.nuget.org/packages/AditiKraft.Aspire.Hosting.SecretSync)
 
@@ -23,11 +23,11 @@ dotnet add package AditiKraft.Aspire.Hosting.SecretSync
     "BucketName": "dev-secrets",
     "ObjectKey": "",
     "EncryptionKey": "from-password-manager",
-    "R2": {
-      "Endpoint": "https://account-id.r2.cloudflarestorage.com",
-      "AccessKeyId": "r2-access-key",
-      "SecretAccessKey": "r2-secret-key",
-      "Region": "auto"
+    "S3": {
+      "Endpoint": "https://s3.us-east-1.amazonaws.com",
+      "AccessKeyId": "s3-access-key",
+      "SecretAccessKey": "s3-secret-key",
+      "Region": "us-east-1"
     }
   }
 }
@@ -44,7 +44,7 @@ var secretSync = builder.Configuration.GetSection("SecretSync");
 
 if (secretSync.GetValue("Enabled", false))
 {
-    var r2 = secretSync.GetSection("R2");
+    var s3 = secretSync.GetSection("S3");
 
     await builder.AddSecretSyncAsync(options =>
     {
@@ -59,10 +59,10 @@ if (secretSync.GetValue("Enabled", false))
         options.MapProjectUserSecrets<Projects.ApiService>("api");
         options.MapProjectUserSecrets<Projects.Web>("web");
 
-        options.R2.Endpoint = r2["Endpoint"] ?? "";
-        options.R2.AccessKeyId = r2["AccessKeyId"] ?? "";
-        options.R2.SecretAccessKey = r2["SecretAccessKey"] ?? "";
-        options.R2.Region = r2["Region"] ?? "auto";
+        options.S3.Endpoint = s3["Endpoint"] ?? "";
+        options.S3.AccessKeyId = s3["AccessKeyId"] ?? "";
+        options.S3.SecretAccessKey = s3["SecretAccessKey"] ?? "";
+        options.S3.Region = s3["Region"] ?? "us-east-1";
     });
 }
 ```
@@ -97,5 +97,7 @@ if (secretSync.GetValue("Enabled", false))
 ## Notes
 
 - `SecretSync` is control config only and is not synced as app secret data.
+- The `S3` section works with AWS S3 and S3-compatible providers such as Cloudflare R2, MinIO, Wasabi, Backblaze B2, and DigitalOcean Spaces when the provider supports conditional object writes.
 - If `ObjectKey` is empty, default is `aspire/apphosts/{user-secrets-id}/latest.json`; when `UserSecretsId` is unavailable it falls back to `aspire/apphosts/{project-id}/latest.json`.
-- Do not commit encryption keys or R2 credentials.
+- For Cloudflare R2, set `Endpoint` to your account R2 endpoint and `Region` to `auto`.
+- Do not commit encryption keys or S3-compatible storage credentials.

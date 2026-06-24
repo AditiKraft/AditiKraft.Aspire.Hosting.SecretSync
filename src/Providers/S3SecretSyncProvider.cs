@@ -6,9 +6,9 @@ using AditiKraft.Aspire.Hosting.SecretSync.Abstractions;
 
 namespace AditiKraft.Aspire.Hosting.SecretSync.Providers;
 
-public sealed class R2SecretSyncProvider : ISecretSyncProvider
+public sealed class S3SecretSyncProvider : ISecretSyncProvider
 {
-    public string Name => "CloudflareR2";
+    public string Name => "S3";
 
     public async Task<SecretSyncRemoteObject?> GetAsync(
         SecretSyncProviderContext context,
@@ -18,7 +18,7 @@ public sealed class R2SecretSyncProvider : ISecretSyncProvider
 
         try
         {
-            using AmazonS3Client client = CreateClient(context.Options.R2);
+            using AmazonS3Client client = CreateClient(context.Options.S3);
             using GetObjectResponse response = await client.GetObjectAsync(
                 context.BucketName,
                 context.ObjectKey,
@@ -58,7 +58,7 @@ public sealed class R2SecretSyncProvider : ISecretSyncProvider
     {
         Validate(context);
 
-        using AmazonS3Client client = CreateClient(context.Options.R2);
+        using AmazonS3Client client = CreateClient(context.Options.S3);
         using var stream = new MemoryStream(body);
 
         var request = new PutObjectRequest
@@ -68,8 +68,8 @@ public sealed class R2SecretSyncProvider : ISecretSyncProvider
             InputStream = stream,
             AutoCloseStream = false,
             ContentType = "application/vnd.aditikraft.secretsync+json",
-            DisableDefaultChecksumValidation = context.Options.R2.DisableDefaultChecksumValidation,
-            DisablePayloadSigning = context.Options.R2.DisablePayloadSigning,
+            DisableDefaultChecksumValidation = context.Options.S3.DisableDefaultChecksumValidation,
+            DisablePayloadSigning = context.Options.S3.DisablePayloadSigning,
             UseChunkEncoding = false
         };
 
@@ -105,14 +105,14 @@ public sealed class R2SecretSyncProvider : ISecretSyncProvider
         }
     }
 
-    private static AmazonS3Client CreateClient(R2SecretSyncOptions r2)
+    private static AmazonS3Client CreateClient(S3SecretSyncOptions s3)
     {
-        var credentials = new BasicAWSCredentials(r2.AccessKeyId, r2.SecretAccessKey);
+        var credentials = new BasicAWSCredentials(s3.AccessKeyId, s3.SecretAccessKey);
         var config = new AmazonS3Config
         {
-            ServiceURL = r2.Endpoint,
-            ForcePathStyle = r2.ForcePathStyle,
-            AuthenticationRegion = string.IsNullOrWhiteSpace(r2.Region) ? "auto" : r2.Region,
+            ServiceURL = s3.Endpoint,
+            ForcePathStyle = s3.ForcePathStyle,
+            AuthenticationRegion = string.IsNullOrWhiteSpace(s3.Region) ? "us-east-1" : s3.Region,
             RequestChecksumCalculation = RequestChecksumCalculation.WHEN_REQUIRED
         };
 
@@ -131,12 +131,12 @@ public sealed class R2SecretSyncProvider : ISecretSyncProvider
             throw new InvalidOperationException("SecretSync ObjectKey is required.");
         }
 
-        R2SecretSyncOptions r2 = context.Options.R2;
-        if (string.IsNullOrWhiteSpace(r2.Endpoint) ||
-            string.IsNullOrWhiteSpace(r2.AccessKeyId) ||
-            string.IsNullOrWhiteSpace(r2.SecretAccessKey))
+        S3SecretSyncOptions s3 = context.Options.S3;
+        if (string.IsNullOrWhiteSpace(s3.Endpoint) ||
+            string.IsNullOrWhiteSpace(s3.AccessKeyId) ||
+            string.IsNullOrWhiteSpace(s3.SecretAccessKey))
         {
-            throw new InvalidOperationException("SecretSync R2 Endpoint, AccessKeyId, and SecretAccessKey are required.");
+            throw new InvalidOperationException("SecretSync S3 Endpoint, AccessKeyId, and SecretAccessKey are required.");
         }
     }
 }

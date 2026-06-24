@@ -35,7 +35,7 @@ public static class SecretSyncExtensions
         ResolveAppHostDefaults(builder, options);
 
         var handle = new SecretSyncHandle();
-        ISecretSyncProvider provider = new R2SecretSyncProvider();
+        ISecretSyncProvider provider = new S3SecretSyncProvider();
         var encryptor = new AesGcmSecretEncryptor(options);
         var userSecretsStore = new UserSecretsStore(options);
         var projectUserSecretsStore = new ProjectUserSecretsStore(options, userSecretsStore);
