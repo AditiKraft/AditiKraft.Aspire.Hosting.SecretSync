@@ -10,6 +10,7 @@ public sealed class SecretSyncOptionsTests
         IConfigurationRoot configuration = new ConfigurationBuilder()
             .AddJsonFile(Path.Combine(
                 FindRepositoryRoot(),
+                "aspire",
                 "AditiKraft.Aspire.Hosting.SecretSync.AppHost",
                 "appsettings.Development.json"))
             .Build();
