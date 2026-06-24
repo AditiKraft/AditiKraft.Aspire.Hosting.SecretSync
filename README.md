@@ -44,14 +44,17 @@ using AditiKraft.Aspire.Hosting.SecretSync;
 using Microsoft.Extensions.Configuration;
 
 var builder = DistributedApplication.CreateBuilder(args);
+var secretSync = builder.Configuration.GetSection("SecretSync");
 
-if (builder.Configuration.GetValue("SecretSync:Enabled", false))
+if (secretSync.GetValue("Enabled", false))
 {
+    var r2 = secretSync.GetSection("R2");
+
     await builder.AddSecretSyncAsync(options =>
     {
-        options.BucketName = builder.Configuration["SecretSync:BucketName"] ?? "";
-        options.ObjectKey = builder.Configuration["SecretSync:ObjectKey"] ?? "";
-        options.EncryptionKey = builder.Configuration["SecretSync:EncryptionKey"] ?? "";
+        options.BucketName = secretSync["BucketName"] ?? "";
+        options.ObjectKey = secretSync["ObjectKey"] ?? "";
+        options.EncryptionKey = secretSync["EncryptionKey"] ?? "";
         options.PullMode = SecretSyncPullMode.Always;
         options.VersionMode = SecretSyncVersionMode.Latest;
         options.WriteToUserSecrets = true;
@@ -60,11 +63,39 @@ if (builder.Configuration.GetValue("SecretSync:Enabled", false))
         options.MapProjectUserSecrets<Projects.ApiService>("api");
         options.MapProjectUserSecrets<Projects.Web>("web");
 
-        options.R2.Endpoint = builder.Configuration["SecretSync:R2:Endpoint"] ?? "";
-        options.R2.AccessKeyId = builder.Configuration["SecretSync:R2:AccessKeyId"] ?? "";
-        options.R2.SecretAccessKey = builder.Configuration["SecretSync:R2:SecretAccessKey"] ?? "";
-        options.R2.Region = builder.Configuration["SecretSync:R2:Region"] ?? "auto";
+        options.R2.Endpoint = r2["Endpoint"] ?? "";
+        options.R2.AccessKeyId = r2["AccessKeyId"] ?? "";
+        options.R2.SecretAccessKey = r2["SecretAccessKey"] ?? "";
+        options.R2.Region = r2["Region"] ?? "auto";
     });
+}
+```
+
+Optional settings you can enable in that block:
+
+```csharp
+options.ConflictMode = SecretSyncConflictMode.PushWins;
+options.PullMode = SecretSyncPullMode.IfStale;
+options.StaleAfter = TimeSpan.FromMinutes(15);
+options.VersionMode = SecretSyncVersionMode.Pinned;
+options.PinnedRevision = "202606240945301234-...";
+```
+
+In the AppHost user-secrets file, `SecretSync` is control config only. Every other key belongs to the AppHost resource and is synced to R2.
+
+When `SecretSync:ObjectKey` is empty, the default is:
+
+```text
+aspire/apphosts/{apphost-user-secrets-id}/latest.json
+```
+
+Example AppHost user-secrets:
+
+```json
+{
+  "SecretSync": { "Enabled": true, "...": "..." },
+  "Parameters": { "postgres-password": "dev-password" },
+  "Cloudflare": { "Turnstile": { "SecretKey": "turnstile-secret" } }
 }
 ```
 
