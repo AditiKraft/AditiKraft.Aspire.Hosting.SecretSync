@@ -14,13 +14,12 @@ if (secretSync.GetValue("Enabled", false))
         options.ObjectKey = secretSync["ObjectKey"] ?? "";
         options.EncryptionKey = secretSync["EncryptionKey"] ?? "";
 
-        options.MapAppHostSecrets("apphost");
-
         options.S3.Endpoint = s3["Endpoint"] ?? "";
         options.S3.AccessKeyId = s3["AccessKeyId"] ?? "";
         options.S3.SecretAccessKey = s3["SecretAccessKey"] ?? "";
         options.S3.Region = s3["Region"] ?? "us-east-1";
 
+        options.MapAppHostSecrets("apphost");
         options.MapProjectUserSecrets<Projects.AditiKraft_Aspire_Hosting_SecretSync_ApiService>("api");
         options.MapProjectUserSecrets<Projects.AditiKraft_Aspire_Hosting_SecretSync_Web>("web");
     });
