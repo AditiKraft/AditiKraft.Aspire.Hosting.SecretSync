@@ -1,5 +1,5 @@
 {
   "appHost": {
-    "path": "AditiKraft.Aspire.Hosting.SecretSync.AppHost/AditiKraft.Aspire.Hosting.SecretSync.AppHost.csproj"
+    "path": "aspire/AditiKraft.Aspire.Hosting.SecretSync.AppHost/AditiKraft.Aspire.Hosting.SecretSync.AppHost.csproj"
   }
 }
