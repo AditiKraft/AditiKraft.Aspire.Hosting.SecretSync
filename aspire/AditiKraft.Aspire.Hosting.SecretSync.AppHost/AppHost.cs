@@ -14,12 +14,6 @@ if (secretSync.GetValue("Enabled", false))
         options.ObjectKey = secretSync["ObjectKey"] ?? "";
         options.EncryptionKey = secretSync["EncryptionKey"] ?? "";
 
-        options.AutoPull = true;
-        options.AutoPush = true;
-        options.PullMode = SecretSyncPullMode.Always;
-        options.VersionMode = SecretSyncVersionMode.Latest;
-        options.WriteToUserSecrets = true;
-
         options.MapAppHostSecrets("apphost");
 
         options.S3.Endpoint = s3["Endpoint"] ?? "";

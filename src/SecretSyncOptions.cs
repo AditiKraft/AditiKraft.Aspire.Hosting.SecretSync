@@ -16,7 +16,7 @@ public sealed class SecretSyncOptions
 
     public S3SecretSyncOptions S3 { get; } = new();
 
-    public bool WriteToUserSecrets { get; set; }
+    public bool WriteToUserSecrets { get; set; } = true;
     public bool ReadFromUserSecrets { get; set; } = true;
     public bool InitializeIfMissing { get; set; } = true;
     public bool FailWhenRemoteMissingAndLocalEmpty { get; set; } = true;

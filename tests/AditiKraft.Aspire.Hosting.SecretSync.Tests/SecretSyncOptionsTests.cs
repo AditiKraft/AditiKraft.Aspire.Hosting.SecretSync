@@ -18,6 +18,18 @@ public sealed class SecretSyncOptionsTests
         Assert.True(string.IsNullOrWhiteSpace(configuration["SecretSync:ObjectKey"]));
     }
 
+    [Fact]
+    public void Defaults_EnableNormalStartupAndShutdownSync()
+    {
+        var options = new SecretSyncOptions();
+
+        Assert.True(options.AutoPull);
+        Assert.True(options.AutoPush);
+        Assert.True(options.WriteToUserSecrets);
+        Assert.Equal(SecretSyncPullMode.Always, options.PullMode);
+        Assert.Equal(SecretSyncVersionMode.Latest, options.VersionMode);
+    }
+
     private static string FindRepositoryRoot()
     {
         string directory = AppContext.BaseDirectory;
