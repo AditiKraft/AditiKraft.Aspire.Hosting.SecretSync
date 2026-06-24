@@ -15,7 +15,7 @@ class Build : NukeBuild
     [Solution] readonly Solution Solution;
     private readonly string RepositoryUrl = "https://github.com/AditiKraft/AditiKraft.Aspire.Hosting.SecretSync";
     AbsolutePath SourceDirectory => RootDirectory / "src";
-    AbsolutePath SampleDirectory => RootDirectory / "sample";
+    AbsolutePath AspireDirectory => RootDirectory / "aspire";
     AbsolutePath ArtifactsDirectory => RootDirectory / "artifacts";
     AbsolutePath PackageOutputDirectory => ArtifactsDirectory / "Packages";
 
@@ -28,7 +28,7 @@ class Build : NukeBuild
     [Parameter("Package version (default: 0.0.10)")] private readonly string PackageVersion = "0.0.11";
 
     private AbsolutePath SampleProjectPath =>
-        SampleDirectory / "AditiKraft.Aspire.Hosting.SecretSync.AppHost" / "AditiKraft.Aspire.Hosting.SecretSync.AppHost.csproj";
+        AspireDirectory / "AditiKraft.Aspire.Hosting.SecretSync.AppHost" / "AditiKraft.Aspire.Hosting.SecretSync.AppHost.csproj";
 
     #region NuGet
 
