@@ -5,7 +5,7 @@ namespace AditiKraft.Aspire.Hosting.SecretSync.Tests;
 public sealed class SecretSyncOptionsTests
 {
     [Fact]
-    public void AppHostSample_LeavesObjectKeyBlankForDerivedDefault()
+    public void AppHostSample_LeavesManifestKeyBlankForDerivedDefault()
     {
         IConfigurationRoot configuration = new ConfigurationBuilder()
             .AddJsonFile(Path.Combine(
@@ -15,7 +15,7 @@ public sealed class SecretSyncOptionsTests
                 "appsettings.Development.json"))
             .Build();
 
-        Assert.True(string.IsNullOrWhiteSpace(configuration["SecretSync:ObjectKey"]));
+        Assert.True(string.IsNullOrWhiteSpace(configuration["SecretSync:S3:ManifestKey"]));
     }
 
     [Fact]

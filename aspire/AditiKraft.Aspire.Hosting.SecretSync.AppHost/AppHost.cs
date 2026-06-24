@@ -10,10 +10,10 @@ if (secretSync.GetValue("Enabled", false))
 
     await builder.AddSecretSyncAsync(options =>
     {
-        options.BucketName = secretSync["BucketName"] ?? "";
-        options.ObjectKey = secretSync["ObjectKey"] ?? "";
         options.EncryptionKey = secretSync["EncryptionKey"] ?? "";
 
+        options.S3.BucketName = s3["BucketName"] ?? "";
+        options.S3.ManifestKey = s3["ManifestKey"] ?? "";
         options.S3.Endpoint = s3["Endpoint"] ?? "";
         options.S3.AccessKeyId = s3["AccessKeyId"] ?? "";
         options.S3.SecretAccessKey = s3["SecretAccessKey"] ?? "";

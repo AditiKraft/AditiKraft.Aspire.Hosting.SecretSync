@@ -123,12 +123,12 @@ public sealed class S3SecretSyncProvider : ISecretSyncProvider
     {
         if (string.IsNullOrWhiteSpace(context.BucketName))
         {
-            throw new InvalidOperationException("SecretSync BucketName is required.");
+            throw new InvalidOperationException("SecretSync S3 BucketName is required.");
         }
 
         if (string.IsNullOrWhiteSpace(context.ObjectKey))
         {
-            throw new InvalidOperationException("SecretSync ObjectKey is required.");
+            throw new InvalidOperationException("SecretSync S3 ManifestKey is required.");
         }
 
         S3SecretSyncOptions s3 = context.Options.S3;

@@ -20,10 +20,10 @@ Add bootstrap config to the AppHost user-secrets file:
 {
   "SecretSync": {
     "Enabled": true,
-    "BucketName": "dev-secrets",
-    "ObjectKey": "",
     "EncryptionKey": "use-a-password-manager-value",
     "S3": {
+      "BucketName": "dev-secrets",
+      "ManifestKey": "",
       "Endpoint": "https://s3.us-east-1.amazonaws.com",
       "AccessKeyId": "s3-access-key",
       "SecretAccessKey": "s3-secret-key",
@@ -48,10 +48,10 @@ if (secretSync.GetValue("Enabled", false))
 
     await builder.AddSecretSyncAsync(options =>
     {
-        options.BucketName = secretSync["BucketName"] ?? "";
-        options.ObjectKey = secretSync["ObjectKey"] ?? "";
         options.EncryptionKey = secretSync["EncryptionKey"] ?? "";
 
+        options.S3.BucketName = s3["BucketName"] ?? "";
+        options.S3.ManifestKey = s3["ManifestKey"] ?? "";
         options.S3.Endpoint = s3["Endpoint"] ?? "";
         options.S3.AccessKeyId = s3["AccessKeyId"] ?? "";
         options.S3.SecretAccessKey = s3["SecretAccessKey"] ?? "";
@@ -154,7 +154,7 @@ Normal development:
 
 ## Remote Storage
 
-If `ObjectKey` is empty, SecretSync derives a manifest key from the AppHost user-secrets id:
+If `S3:ManifestKey` is empty, SecretSync derives a manifest key from the AppHost user-secrets id:
 
 ```text
 aspire/apphosts/{user-secrets-id}/latest.json

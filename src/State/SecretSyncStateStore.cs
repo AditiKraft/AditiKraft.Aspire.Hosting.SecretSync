@@ -103,7 +103,7 @@ internal sealed class SecretSyncStateStore(SecretSyncOptions options)
 
     private string GetObjectKeyHash()
     {
-        string key = $"{options.BucketName}|{options.ObjectKey}";
+        string key = $"{options.S3.BucketName}|{options.S3.ManifestKey}";
         string hash = SecretValueHasher.Hash(key).ToLowerInvariant();
         return hash[..Math.Min(hash.Length, 16)];
     }

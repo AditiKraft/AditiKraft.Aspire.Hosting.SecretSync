@@ -4,8 +4,6 @@ namespace AditiKraft.Aspire.Hosting.SecretSync;
 
 public sealed class SecretSyncOptions
 {
-    public string BucketName { get; set; } = "";
-    public string ObjectKey { get; set; } = "";
     public string EncryptionKey { get; set; } = "";
     public bool AutoPush { get; set; } = true;
     public bool AutoPull { get; set; } = true;
@@ -95,6 +93,8 @@ public enum SecretSyncVersionMode
 
 public sealed class S3SecretSyncOptions
 {
+    public string BucketName { get; set; } = "";
+    public string ManifestKey { get; set; } = "";
     public string Endpoint { get; set; } = "";
     public string AccessKeyId { get; set; } = "";
     public string SecretAccessKey { get; set; } = "";

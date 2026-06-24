@@ -454,10 +454,10 @@ internal sealed class SecretSyncCoordinator(
     }
 
     private SecretSyncProviderContext CreateContext(string objectKey) =>
-        new(options.BucketName, objectKey.Trim().TrimStart('/'), options);
+        new(options.S3.BucketName, objectKey.Trim().TrimStart('/'), options);
 
     private string GetManifestObjectKey() =>
-        options.ObjectKey.Trim().TrimStart('/');
+        options.S3.ManifestKey.Trim().TrimStart('/');
 
     private string CreateVersionObjectKey(string revision)
     {

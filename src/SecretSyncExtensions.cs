@@ -97,13 +97,13 @@ public static class SecretSyncExtensions
             }
         }
 
-        if (string.IsNullOrWhiteSpace(options.ObjectKey))
+        if (string.IsNullOrWhiteSpace(options.S3.ManifestKey))
         {
-            options.ObjectKey = CreateDefaultObjectKey(options);
+            options.S3.ManifestKey = CreateDefaultManifestKey(options);
         }
     }
 
-    private static string CreateDefaultObjectKey(SecretSyncOptions options)
+    private static string CreateDefaultManifestKey(SecretSyncOptions options)
     {
         string identity = !string.IsNullOrWhiteSpace(options.UserSecretsId)
             ? options.UserSecretsId

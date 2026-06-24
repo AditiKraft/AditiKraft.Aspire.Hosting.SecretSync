@@ -38,7 +38,7 @@ public sealed class SecretSyncCoordinatorVersionTests : IDisposable
 
         await coordinator.PullAsync(configuration, CancellationToken.None);
 
-        SecretSyncManifest firstManifest = provider.ReadManifest(options.ObjectKey);
+        SecretSyncManifest firstManifest = provider.ReadManifest(options.S3.ManifestKey);
 
         await userSecretsStore.MergeAsync(
             options.UserSecretsId,
@@ -52,7 +52,7 @@ public sealed class SecretSyncCoordinatorVersionTests : IDisposable
 
         await coordinator.PushAsync(CancellationToken.None);
 
-        SecretSyncManifest latestManifest = provider.ReadManifest(options.ObjectKey);
+        SecretSyncManifest latestManifest = provider.ReadManifest(options.S3.ManifestKey);
         SecretSyncVault latestVault = encryptor.Decrypt(provider.Objects[latestManifest.VaultObjectKey].Body).Vault;
         Dictionary<string, string?> latestAppHost = VaultFlattener.Flatten(latestVault.Resources["apphost"]);
 
@@ -129,14 +129,14 @@ public sealed class SecretSyncCoordinatorVersionTests : IDisposable
     {
         var options = new SecretSyncOptions
         {
-            BucketName = "unit-test-bucket",
-            ObjectKey = "app/latest.json",
             EncryptionKey = "unit-test-encryption-key",
             UserSecretsId = $"secretsync-test-{Guid.NewGuid():N}",
             StateDirectory = Directory.CreateTempSubdirectory("secretsync-state-").FullName,
             WriteToUserSecrets = true
         };
 
+        options.S3.BucketName = "unit-test-bucket";
+        options.S3.ManifestKey = "app/latest.json";
         options.KeyDerivation.MemorySizeKiB = 1024;
         options.KeyDerivation.Iterations = 1;
         options.KeyDerivation.DegreeOfParallelism = 1;
