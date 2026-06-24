@@ -1,0 +1,396 @@
+# AditiKraft.Aspire.Hosting.SecretSync Architecture
+
+`AditiKraft.Aspire.Hosting.SecretSync` is an Aspire hosting package that syncs development secrets across machines during AppHost startup and shutdown.
+
+The current v1 model is intentionally simple:
+
+```text
+SecretSync section = bootstrap/control config, never synced as secret data
+Everything else in AppHost user-secrets = apphost resource secrets
+Everything else in a mapped project user-secrets file = that resource's secrets
+R2 stores one encrypted resources vault
+```
+
+There is no `global` concept and no `shared` concept in v1. Each resource owns its own secrets. If two projects need the same value, store it in both resources for now. Resource inheritance can be added later if duplication becomes painful.
+
+## Local Shape
+
+### AppHost User-Secrets
+
+The AppHost user-secrets file contains SecretSync bootstrap values plus AppHost-specific secrets outside the `SecretSync` section:
+
+```json
+{
+  "SecretSync": {
+    "Enabled": true,
+    "BucketName": "dev-secrets",
+    "ObjectKey": "",
+    "EncryptionKey": "from-password-manager",
+    "R2": {
+      "Endpoint": "https://account-id.r2.cloudflarestorage.com",
+      "AccessKeyId": "r2-access-key",
+      "SecretAccessKey": "r2-secret-key",
+      "Region": "auto"
+    }
+  },
+  "Parameters": {
+    "postgres-password": "dev-password"
+  },
+  "Cloudflare": {
+    "Turnstile": {
+      "SecretKey": "turnstile-secret"
+    }
+  }
+}
+```
+
+Everything under `SecretSync` is control-plane config and is not copied into the encrypted vault as application secret data.
+
+Everything outside `SecretSync` becomes:
+
+```json
+{
+  "resources": {
+    "apphost": {
+      "Parameters": {
+        "postgres-password": "dev-password"
+      },
+      "Cloudflare": {
+        "Turnstile": {
+          "SecretKey": "turnstile-secret"
+        }
+      }
+    }
+  }
+}
+```
+
+### API Project User-Secrets
+
+API project user-secrets should contain only API-specific values:
+
+```json
+{
+  "Stripe": {
+    "ApiKey": "sk_api"
+  },
+  "Jwt": {
+    "SigningKey": "api-jwt-key"
+  }
+}
+```
+
+This becomes `resources.api`.
+
+### Web Project User-Secrets
+
+Web project user-secrets should contain only Web-specific values:
+
+```json
+{
+  "Stripe": {
+    "ApiKey": "sk_web"
+  },
+  "Auth": {
+    "Google": {
+      "ClientSecret": "web-google-secret"
+    }
+  }
+}
+```
+
+This becomes `resources.web`.
+
+## Remote Vault Shape
+
+R2 stores one client-side encrypted JSON vault. After decrypting, the logical payload looks like:
+
+```json
+{
+  "version": 1,
+  "resources": {
+    "apphost": {
+      "Parameters": {
+        "postgres-password": "dev-password"
+      },
+      "Cloudflare": {
+        "Turnstile": {
+          "SecretKey": "turnstile-secret"
+        }
+      }
+    },
+    "api": {
+      "Stripe": {
+        "ApiKey": "sk_api"
+      },
+      "Jwt": {
+        "SigningKey": "api-jwt-key"
+      }
+    },
+    "web": {
+      "Stripe": {
+        "ApiKey": "sk_web"
+      },
+      "Auth": {
+        "Google": {
+          "ClientSecret": "web-google-secret"
+        }
+      }
+    }
+  }
+}
+```
+
+The JSON above is never written to disk in plaintext by SecretSync. R2 receives an encrypted envelope containing this vault.
+
+## AppHost API
+
+The normal AppHost usage is:
+
+```csharp
+using AditiKraft.Aspire.Hosting.SecretSync;
+using Microsoft.Extensions.Configuration;
+
+var builder = DistributedApplication.CreateBuilder(args);
+
+if (builder.Configuration.GetValue("SecretSync:Enabled", false))
+{
+    await builder.AddSecretSyncAsync(options =>
+    {
+        options.Provider = SecretSyncProvider.CloudflareR2;
+        options.BucketName = builder.Configuration["SecretSync:BucketName"] ?? "";
+        options.ObjectKey = builder.Configuration["SecretSync:ObjectKey"] ?? "";
+        options.EncryptionKey = builder.Configuration["SecretSync:EncryptionKey"] ?? "";
+        options.AutoPull = true;
+        options.AutoPush = true;
+        options.WriteToUserSecrets = true;
+
+        options.MapAppHostSecrets("apphost");
+        options.MapProjectUserSecrets<Projects.ApiService>("api");
+        options.MapProjectUserSecrets<Projects.Web>("web");
+
+        options.R2.Endpoint = builder.Configuration["SecretSync:R2:Endpoint"] ?? "";
+        options.R2.AccessKeyId = builder.Configuration["SecretSync:R2:AccessKeyId"] ?? "";
+        options.R2.SecretAccessKey = builder.Configuration["SecretSync:R2:SecretAccessKey"] ?? "";
+        options.R2.Region = builder.Configuration["SecretSync:R2:Region"] ?? "auto";
+    });
+}
+
+var api = builder.AddProject<Projects.ApiService>("api");
+
+builder.AddProject<Projects.Web>("web")
+    .WithReference(api);
+
+builder.Build().Run();
+```
+
+Mapped .NET projects do not need `.WithSecretSync(...)`. SecretSync writes each project's own user-secrets file before resources start.
+
+`.WithSecretSync(...)` remains useful for containers and non-.NET resources that cannot load .NET user-secrets:
+
+```csharp
+builder.AddContainer("toolbox", "example/toolbox")
+    .WithSecretSync(secretSync, resourceNames: ["toolbox"], includeResourceMatchingName: false);
+```
+
+## Resource Mapping
+
+| Local source | Synced resource |
+|---|---|
+| AppHost user-secrets outside `SecretSync` | `resources.apphost` |
+| API project user-secrets outside `SecretSync` | `resources.api` |
+| Web project user-secrets outside `SecretSync` | `resources.web` |
+
+Keys beginning with `SecretSync:` are reserved for SecretSync bootstrap and materialization metadata. They are ignored when building resource data.
+
+## New Machine Flow
+
+On a new machine, the developer only needs bootstrap config in the AppHost user-secrets file:
+
+```json
+{
+  "SecretSync": {
+    "Enabled": true,
+    "BucketName": "dev-secrets",
+    "ObjectKey": "",
+    "EncryptionKey": "from-password-manager",
+    "R2": {
+      "Endpoint": "https://account-id.r2.cloudflarestorage.com",
+      "AccessKeyId": "r2-access-key",
+      "SecretAccessKey": "r2-secret-key",
+      "Region": "auto"
+    }
+  }
+}
+```
+
+Then AppHost startup:
+
+1. Resolves the R2 object key. If `ObjectKey` is empty, it derives a stable key from the AppHost `UserSecretsId`.
+2. Pulls the encrypted R2 vault.
+3. Decrypts it locally.
+4. Writes `resources.apphost` into the AppHost user-secrets file outside `SecretSync`.
+5. Writes `resources.api` into the API project user-secrets file.
+6. Writes `resources.web` into the Web project user-secrets file.
+7. Injects `resources.apphost` into AppHost `IConfiguration` before resources start.
+
+The derived object key format is:
+
+```text
+aspire/apphosts/{apphost-user-secrets-id}/secretsync.vault.json
+```
+
+Set `ObjectKey` explicitly only when multiple AppHosts should intentionally share one encrypted vault.
+
+## Startup And Shutdown
+
+SecretSync is not a file watcher.
+
+```text
+AppHost startup  -> pull, decrypt, merge, hydrate user-secrets
+AppHost shutdown -> read local changes, merge, encrypt, push
+```
+
+If the remote object does not exist:
+
+| Local state | Behavior |
+|---|---|
+| Local AppHost/project secrets exist | Initialize R2 with the local vault |
+| No local secrets exist | Fail by default |
+
+## Conflict Behavior
+
+SecretSync writes hidden metadata keys such as:
+
+```text
+SecretSync:Materialized:{encoded-key}:Sha256
+```
+
+These metadata values do not contain plaintext secrets. They let SecretSync distinguish "unchanged value that was pulled from R2" from "developer intentionally edited this value locally."
+
+Scenarios:
+
+| Scenario | Behavior |
+|---|---|
+| Add new key in API user-secrets | Added to `resources.api` and pushed |
+| Change existing API key after pull | Local edit wins if R2 still matches the materialized baseline |
+| Same key changed on another machine too | Conflict is raised |
+| Add new key outside `SecretSync` in AppHost user-secrets | Added to `resources.apphost` and pushed |
+| Add key inside `SecretSync` | Treated as control config, not synced as secret data |
+| Delete a key locally | Delete semantics are not finalized; remote values may be restored |
+
+Example safe edit:
+
+```text
+baseline from R2: resources.api.Stripe.ApiKey = sk_old
+local edit:       resources.api.Stripe.ApiKey = sk_new
+remote still:     resources.api.Stripe.ApiKey = sk_old
+result:           sk_new is accepted and pushed
+```
+
+Example conflict:
+
+```text
+baseline from R2: resources.api.Stripe.ApiKey = sk_old
+local edit:       resources.api.Stripe.ApiKey = sk_local_new
+remote now:       resources.api.Stripe.ApiKey = sk_remote_new
+result:           conflict
+```
+
+## Security Model
+
+R2 never receives plaintext secret values.
+
+Encryption:
+
+```text
+AES-256-GCM
+Argon2id key derivation
+Random salt per envelope
+Random nonce per encryption
+One encrypted JSON payload per AppHost vault
+```
+
+The encryption key must come from a password manager, environment variable, devcontainer secret, or local user-secrets bootstrap config. Do not commit it.
+
+Best practices:
+
+1. Keep `SecretSync:EncryptionKey` out of git.
+2. Use a long random passphrase.
+3. Use least-privilege R2 credentials for the bucket/object prefix.
+4. Rotate R2 access keys if a machine is lost.
+5. Do not log secret values or decrypted vault contents.
+6. Do not edit the R2 object manually.
+
+## Devcontainers And Remote Hosts
+
+For devcontainers, pass only bootstrap config:
+
+```json
+{
+  "containerEnv": {
+    "SecretSync__Enabled": "true",
+    "SecretSync__BucketName": "${localEnv:SECRET_SYNC_BUCKET}",
+    "SecretSync__EncryptionKey": "${localEnv:SECRET_SYNC_ENCRYPTION_KEY}",
+    "SecretSync__R2__Endpoint": "${localEnv:SECRET_SYNC_R2_ENDPOINT}",
+    "SecretSync__R2__AccessKeyId": "${localEnv:SECRET_SYNC_R2_ACCESS_KEY_ID}",
+    "SecretSync__R2__SecretAccessKey": "${localEnv:SECRET_SYNC_R2_SECRET_ACCESS_KEY}"
+  }
+}
+```
+
+If the devcontainer has a different filesystem, SecretSync still works because it resolves `.NET user-secrets` paths inside that environment and hydrates them during AppHost startup.
+
+## Migration From Existing User-Secrets
+
+1. Add SecretSync bootstrap config to AppHost user-secrets.
+2. Keep AppHost-specific values outside the `SecretSync` section.
+3. Keep each project-specific value in that project's own user-secrets file.
+4. Map each project in AppHost with `MapProjectUserSecrets`.
+5. Run AppHost once. If R2 is empty, it initializes the encrypted vault from local files.
+6. On other machines, add only bootstrap config and run AppHost to hydrate secrets.
+
+## Folder Structure
+
+```text
+src/
+  Abstractions/
+    ISecretSyncProvider.cs
+  Configuration/
+    SecretSnapshotBuilder.cs
+    SecretSyncConfigurationInjector.cs
+    SecretSyncLocalSnapshot.cs
+    SecretSyncVault.cs
+    SecretSyncVaultMerger.cs
+    SecretValueHasher.cs
+    VaultFlattener.cs
+  Cryptography/
+    AesGcmSecretEncryptor.cs
+    Argon2idKeyDeriver.cs
+    SecretPayload.cs
+    SecretPayloadSerializer.cs
+  Lifecycle/
+    SecretSyncCoordinator.cs
+    SecretSyncShutdownHostedService.cs
+  Providers/
+    R2SecretSyncProvider.cs
+  UserSecrets/
+    ProjectUserSecretsResolver.cs
+    ProjectUserSecretsStore.cs
+    UserSecretsMaterializer.cs
+    UserSecretsStore.cs
+  SecretSyncExtensions.cs
+  SecretSyncOptions.cs
+tests/
+  AditiKraft.Aspire.Hosting.SecretSync.Tests/
+```
+
+## Future Providers
+
+1. GitHub Gist.
+2. Amazon S3.
+3. Azure Blob Storage.
+4. Supabase Storage.
+5. Local file provider for tests and demos.
+
+Provider implementations should only store encrypted bytes and metadata. Encryption remains client-side and provider-independent.
