@@ -1,24 +1,20 @@
 # AditiKraft.Aspire.Hosting.SecretSync
 
-Dev-time encrypted secret synchronization for .NET Aspire AppHost.
+Encrypted secret sync for .NET Aspire AppHost and mapped project user-secrets.
 
-SecretSync hydrates AppHost and mapped project user-secrets during Aspire startup, then pushes local edits back to Cloudflare R2 on shutdown. It is designed for teams that want `dotnet user-secrets sync` behavior without a separate CLI.
+[![NuGet](https://img.shields.io/nuget/v/AditiKraft.Aspire.Hosting.SecretSync.svg)](https://www.nuget.org/packages/AditiKraft.Aspire.Hosting.SecretSync)
 
-## Features
+NuGet: https://www.nuget.org/packages/AditiKraft.Aspire.Hosting.SecretSync
 
-- Aspire AppHost extension API: `builder.AddSecretSync(...)`
-- AppHost secrets loaded into `IConfiguration` before resources start
-- Project-specific user-secrets hydration through `MapProjectUserSecrets`
-- Cloudflare R2 backend with client-side AES-256-GCM encryption
-- Argon2id key derivation from a developer-held encryption key
-- Provider-independent versioning: stable manifest plus immutable encrypted vault versions
-- Pull modes: `Always`, `IfStale`, `Manual`
-- Version modes: `Latest`, `Pinned`
-- Local baseline hashes stored outside `secrets.json`; no plaintext state file
+## Install
 
-## Quick Start
+```bash
+dotnet add package AditiKraft.Aspire.Hosting.SecretSync
+```
 
-Add bootstrap config to the AppHost user-secrets file:
+## Minimal setup
+
+1. Add bootstrap config to AppHost user-secrets:
 
 ```json
 {
@@ -37,7 +33,7 @@ Add bootstrap config to the AppHost user-secrets file:
 }
 ```
 
-Then wire it into AppHost:
+2. Wire it in AppHost:
 
 ```csharp
 using AditiKraft.Aspire.Hosting.SecretSync;
@@ -71,56 +67,8 @@ if (secretSync.GetValue("Enabled", false))
 }
 ```
 
-Optional settings you can enable in that block:
+## Notes
 
-```csharp
-options.ConflictMode = SecretSyncConflictMode.PushWins;
-options.PullMode = SecretSyncPullMode.IfStale;
-options.StaleAfter = TimeSpan.FromMinutes(15);
-options.VersionMode = SecretSyncVersionMode.Pinned;
-options.PinnedRevision = "202606240945301234-...";
-```
-
-In the AppHost user-secrets file, `SecretSync` is control config only. Every other key belongs to the AppHost resource and is synced to R2.
-
-When `SecretSync:ObjectKey` is empty, the default is:
-
-```text
-aspire/apphosts/{apphost-user-secrets-id}/latest.json
-```
-
-Example AppHost user-secrets:
-
-```json
-{
-  "SecretSync": { "Enabled": true, "...": "..." },
-  "Parameters": { "postgres-password": "dev-password" },
-  "Cloudflare": { "Turnstile": { "SecretKey": "turnstile-secret" } }
-}
-```
-
-## Local Secret Model
-
-`SecretSync` is control config and is never synced as app secret data.
-
-Everything else in the AppHost user-secrets file becomes `resources.apphost`. Everything else in a mapped project's user-secrets file becomes that mapped resource.
-
-## Versioning
-
-`ObjectKey` points to a manifest such as:
-
-```text
-aspire/apphosts/{apphost-user-secrets-id}/latest.json
-```
-
-Encrypted versions are stored beside it:
-
-```text
-aspire/apphosts/{apphost-user-secrets-id}/versions/{revision}.vault.json
-```
-
-Use `SecretSyncPullMode.IfStale` to avoid checking R2 on every local run when local state is fresh. Use `SecretSyncVersionMode.Pinned` with `PinnedRevision` to reproduce a specific version in read-only mode.
-
-## Documentation
-
-See [ARCHITECTURE.md](ARCHITECTURE.md) for the full architecture, conflict behavior, devcontainer guidance, migration path, and provider roadmap.
+- `SecretSync` is control config only and is not synced as app secret data.
+- If `ObjectKey` is empty, default is `aspire/apphosts/{user-secrets-id}/latest.json`; when `UserSecretsId` is unavailable it falls back to `aspire/apphosts/{project-id}/latest.json`.
+- Do not commit encryption keys or R2 credentials.
