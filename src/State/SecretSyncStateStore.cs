@@ -30,9 +30,14 @@ internal sealed class SecretSyncStateStore(SecretSyncOptions options)
 
     public async Task SaveVaultBaselineAsync(
         SecretSyncVault vault,
+        SecretSyncRemoteState? remote,
         CancellationToken cancellationToken)
     {
         var state = new SecretSyncState();
+        if (remote is not null)
+        {
+            state.Remote = remote;
+        }
 
         foreach ((string resourceName, System.Text.Json.Nodes.JsonObject resource) in vault.Resources)
         {
@@ -125,7 +130,8 @@ internal sealed class SecretSyncStateStore(SecretSyncOptions options)
 
         var normalized = new SecretSyncState
         {
-            Version = state.Version
+            Version = state.Version,
+            Remote = state.Remote ?? new SecretSyncRemoteState()
         };
 
         foreach ((string resourceName, Dictionary<string, string> hashes) in state.Resources)

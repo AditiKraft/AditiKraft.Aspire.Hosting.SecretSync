@@ -10,6 +10,10 @@ public sealed class SecretSyncOptions
     public string EncryptionKey { get; set; } = "";
     public bool AutoPush { get; set; } = true;
     public bool AutoPull { get; set; } = true;
+    public SecretSyncPullMode PullMode { get; set; } = SecretSyncPullMode.Always;
+    public TimeSpan StaleAfter { get; set; } = TimeSpan.FromMinutes(15);
+    public SecretSyncVersionMode VersionMode { get; set; } = SecretSyncVersionMode.Latest;
+    public string PinnedRevision { get; set; } = "";
 
     public R2SecretSyncOptions R2 { get; } = new();
 
@@ -94,6 +98,19 @@ public enum SecretSyncMissingResourceBehavior
     Ignore,
     Warn,
     Fail
+}
+
+public enum SecretSyncPullMode
+{
+    Always,
+    IfStale,
+    Manual
+}
+
+public enum SecretSyncVersionMode
+{
+    Latest,
+    Pinned
 }
 
 public sealed class R2SecretSyncOptions

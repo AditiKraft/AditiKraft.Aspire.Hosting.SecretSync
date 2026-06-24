@@ -74,6 +74,51 @@ public sealed class ProjectUserSecretsStoreTests : IDisposable
         Assert.Equal("api", read.Edits[0].ResourceName);
     }
 
+    [Fact]
+    public async Task BuildLocalSnapshotAsync_IgnoresMappedProjectWhenSecretsMatchBaseline()
+    {
+        string userSecretsId = $"secretsync-test-{Guid.NewGuid():N}";
+        string projectPath = await CreateProjectAsync(userSecretsId);
+        TrackUserSecretsDirectory(userSecretsId);
+
+        string stateDirectory = Directory.CreateTempSubdirectory("secretsync-state-").FullName;
+        TrackDirectory(stateDirectory);
+
+        var options = new SecretSyncOptions
+        {
+            ReadFromUserSecrets = false,
+            StateDirectory = stateDirectory
+        };
+        options.MapProjectUserSecrets("api", projectPath);
+
+        var userSecretsStore = new UserSecretsStore(options);
+        var projectStore = new ProjectUserSecretsStore(options, userSecretsStore);
+        var stateStore = new SecretSyncStateStore(options);
+        var snapshotBuilder = new SecretSnapshotBuilder(options, userSecretsStore, projectStore, stateStore);
+
+        var vault = new SecretSyncVault
+        {
+            Resources =
+            {
+                ["api"] = JsonNode.Parse("""{ "Stripe": { "ApiKey": "sk-api" } }""")!.AsObject()
+            }
+        };
+
+        await userSecretsStore.WriteAsync(
+            userSecretsId,
+            new Dictionary<string, string?>
+            {
+                ["Stripe:ApiKey"] = "sk-api"
+            },
+            CancellationToken.None);
+        await stateStore.SaveVaultBaselineAsync(vault, remote: null, CancellationToken.None);
+
+        SecretSyncLocalSnapshot snapshot = await snapshotBuilder.BuildLocalSnapshotAsync(CancellationToken.None);
+
+        Assert.True(snapshot.Vault.IsEmpty);
+        Assert.Empty(snapshot.ProjectEdits);
+    }
+
     public void Dispose()
     {
         foreach (string directory in _secretDirectories)
@@ -107,6 +152,14 @@ public sealed class ProjectUserSecretsStoreTests : IDisposable
     {
         string path = PathHelper.GetSecretsPathFromSecretsId(userSecretsId);
         string? directory = Path.GetDirectoryName(path);
+        if (!string.IsNullOrWhiteSpace(directory))
+        {
+            TrackDirectory(directory);
+        }
+    }
+
+    private void TrackDirectory(string directory)
+    {
         if (!string.IsNullOrWhiteSpace(directory))
         {
             _secretDirectories.Add(directory);

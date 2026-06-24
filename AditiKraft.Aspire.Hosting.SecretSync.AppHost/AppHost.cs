@@ -13,12 +13,20 @@ if (builder.Configuration.GetValue("SecretSync:Enabled", false))
         options.EncryptionKey = builder.Configuration["SecretSync:EncryptionKey"] ?? "";
         options.AutoPull = true;
         options.AutoPush = true;
+        options.PullMode = SecretSyncPullMode.Always;
+        options.VersionMode = SecretSyncVersionMode.Latest;
         options.WriteToUserSecrets = true;
         options.MapAppHostSecrets("apphost");
         // options.ConflictMode = SecretSyncConflictMode.PushWins;
+        // options.PullMode = SecretSyncPullMode.IfStale;
+        // options.StaleAfter = TimeSpan.FromMinutes(15);
+        // options.VersionMode = SecretSyncVersionMode.Pinned;
+        // options.PinnedRevision = "202606240945301234-...";
 
         // In the AppHost user-secrets file, SecretSync is control config only.
         // Every other key belongs to the AppHost resource and is synced to R2.
+        // Empty SecretSync:ObjectKey derives:
+        // aspire/apphosts/{apphost-user-secrets-id}/latest.json
         //
         // Example:
         // {

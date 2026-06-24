@@ -14,6 +14,7 @@ internal static class UserSecretsMaterializer
     {
         var resource = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
         var edits = new List<SecretSyncLocalEdit>();
+        var currentKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
         foreach ((string key, string? value) in values)
         {
@@ -22,6 +23,7 @@ internal static class UserSecretsMaterializer
                 continue;
             }
 
+            currentKeys.Add(key);
             baselineHashes.TryGetValue(key, out string? baselineHash);
             if (baselineHash is not null &&
                 string.Equals(baselineHash, SecretValueHasher.Hash(value), StringComparison.Ordinal))
@@ -33,7 +35,24 @@ internal static class UserSecretsMaterializer
             edits.Add(new SecretSyncLocalEdit(resourceName, key, value, baselineHash));
         }
 
-        return new UserSecretsReadResult(resource, edits);
+        bool hasMissingBaselineValues = baselineHashes.Keys.Any(key => !currentKeys.Contains(key));
+        return new UserSecretsReadResult(resource, edits, hasMissingBaselineValues);
+    }
+
+    public static Dictionary<string, string?> ReadResourceValues(
+        IReadOnlyDictionary<string, string?> values)
+    {
+        var resource = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
+
+        foreach ((string key, string? value) in values)
+        {
+            if (!IsControlKey(key))
+            {
+                resource[key] = value;
+            }
+        }
+
+        return resource;
     }
 
     public static void Materialize(
@@ -66,4 +85,5 @@ internal static class UserSecretsMaterializer
 
 internal sealed record UserSecretsReadResult(
     IReadOnlyDictionary<string, string?> Resource,
-    IReadOnlyList<SecretSyncLocalEdit> Edits);
+    IReadOnlyList<SecretSyncLocalEdit> Edits,
+    bool HasMissingBaselineValues);

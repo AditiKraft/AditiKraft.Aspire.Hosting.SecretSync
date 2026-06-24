@@ -8,7 +8,7 @@ The current v1 model is intentionally simple:
 SecretSync section = bootstrap/control config, never synced as secret data
 Everything else in AppHost user-secrets = apphost resource secrets
 Everything else in a mapped project user-secrets file = that resource's secrets
-R2 stores one encrypted resources vault
+R2 stores one small plaintext manifest plus immutable encrypted vault versions
 ```
 
 There is no `global` concept and no `shared` concept in v1. Each resource owns its own secrets. If two projects need the same value, store it in both resources for now. Resource inheritance can be added later if duplication becomes painful.
@@ -101,9 +101,32 @@ Web project user-secrets should contain only Web-specific values:
 
 This becomes `resources.web`.
 
-## Remote Vault Shape
+## Remote Object Shape
 
-R2 stores one client-side encrypted JSON vault. After decrypting, the logical payload looks like:
+SecretSync uses provider-independent versioning. `SecretSync:ObjectKey` points at a stable manifest object. The manifest contains no secret values; it only points at the current encrypted vault version.
+
+Example manifest object at `aspire/apphosts/{apphost-user-secrets-id}/latest.json`:
+
+```json
+{
+  "format": "aditikraft.secretsync.manifest.v1",
+  "schemaVersion": 1,
+  "latestRevision": "202606240945301234-4e2f...",
+  "vaultObjectKey": "aspire/apphosts/491f37e6-e082-477b-9df6-480d2023fe72/versions/202606240945301234-4e2f....vault.json",
+  "contentHash": "sha256-content-hash",
+  "parentRevision": "202606231712009876-a1b2...",
+  "createdAt": "2026-06-23T17:12:00.9876+00:00",
+  "updatedAt": "2026-06-24T09:45:30.1234+00:00"
+}
+```
+
+Each vault version is immutable. Version object keys are generated beside the manifest:
+
+```text
+aspire/apphosts/{apphost-user-secrets-id}/versions/{revision}.vault.json
+```
+
+After decrypting a version object, the logical payload looks like:
 
 ```json
 {
@@ -141,7 +164,7 @@ R2 stores one client-side encrypted JSON vault. After decrypting, the logical pa
 }
 ```
 
-The JSON above is never written to disk in plaintext by SecretSync. R2 receives an encrypted envelope containing this vault.
+The JSON above is never written to disk in plaintext by SecretSync. R2 receives an encrypted envelope containing this vault. Only the manifest metadata is plaintext.
 
 ## AppHost API
 
@@ -163,6 +186,8 @@ if (builder.Configuration.GetValue("SecretSync:Enabled", false))
         options.EncryptionKey = builder.Configuration["SecretSync:EncryptionKey"] ?? "";
         options.AutoPull = true;
         options.AutoPush = true;
+        options.PullMode = SecretSyncPullMode.Always;
+        options.VersionMode = SecretSyncVersionMode.Latest;
         options.WriteToUserSecrets = true;
 
         options.MapAppHostSecrets("apphost");
@@ -183,6 +208,22 @@ builder.AddProject<Projects.Web>("web")
 
 builder.Build().Run();
 ```
+
+Use `IfStale` when you want fewer remote checks during normal local development:
+
+```csharp
+options.PullMode = SecretSyncPullMode.IfStale;
+options.StaleAfter = TimeSpan.FromMinutes(15);
+```
+
+Use pinned mode when you need to reproduce an exact synced version:
+
+```csharp
+options.VersionMode = SecretSyncVersionMode.Pinned;
+options.PinnedRevision = "202606240945301234-4e2f...";
+```
+
+Pinned mode is read-only. SecretSync will not push while pinned, and it fails if local synced secrets have unbaselined edits.
 
 Mapped .NET projects do not need `.WithSecretSync(...)`. SecretSync writes each project's own user-secrets file before resources start.
 
@@ -227,20 +268,21 @@ On a new machine, the developer only needs bootstrap config in the AppHost user-
 Then AppHost startup:
 
 1. Resolves the R2 object key. If `ObjectKey` is empty, it derives a stable key from the AppHost `UserSecretsId`.
-2. Pulls the encrypted R2 vault.
-3. Decrypts it locally.
-4. Writes `resources.apphost` into the AppHost user-secrets file outside `SecretSync`.
-5. Writes `resources.api` into the API project user-secrets file.
-6. Writes `resources.web` into the Web project user-secrets file.
-7. Injects `resources.apphost` into AppHost `IConfiguration` before resources start.
+2. Reads the manifest unless `PullMode` allows a local-only startup.
+3. Pulls the encrypted version object only when the local state is missing, stale, or behind the manifest.
+4. Decrypts the version locally.
+5. Writes `resources.apphost` into the AppHost user-secrets file outside `SecretSync`.
+6. Writes `resources.api` into the API project user-secrets file.
+7. Writes `resources.web` into the Web project user-secrets file.
+8. Injects `resources.apphost` into AppHost `IConfiguration` before resources start.
 
 The derived object key format is:
 
 ```text
-aspire/apphosts/{apphost-user-secrets-id}/secretsync.vault.json
+aspire/apphosts/{apphost-user-secrets-id}/latest.json
 ```
 
-Set `ObjectKey` explicitly only when multiple AppHosts should intentionally share one encrypted vault.
+Set `ObjectKey` explicitly only when multiple AppHosts should intentionally share one manifest and version history.
 
 ## Startup And Shutdown
 
@@ -251,12 +293,29 @@ AppHost startup  -> pull, decrypt, merge, hydrate user-secrets
 AppHost shutdown -> read local changes, merge, encrypt, push
 ```
 
+Pull modes:
+
+| Mode | Startup behavior | Shutdown behavior |
+|---|---|---|
+| `Always` | Checks the manifest every run. If the manifest revision matches local state and there are no local edits or missing baseline values, it skips the encrypted vault download and uses local user-secrets. | Pushes a new version when local values differ from the last pulled content hash. |
+| `IfStale` | Skips R2 entirely when the last successful check is within `StaleAfter`, no local edits exist, and no baseline values are missing. Otherwise behaves like `Always`. | Same as `Always`. |
+| `Manual` | Never calls R2. Loads only local user-secrets into AppHost configuration. | Does not push. |
+
+Version modes:
+
+| Mode | Behavior |
+|---|---|
+| `Latest` | Uses the manifest's latest revision and can create a new version on shutdown. |
+| `Pinned` | Pulls `versions/{PinnedRevision}.vault.json`, does not push, and fails if local synced secrets have unbaselined edits. |
+
 If the remote object does not exist:
 
 | Local state | Behavior |
 |---|---|
-| Local AppHost/project secrets exist | Initialize R2 with the local vault |
+| Local AppHost/project secrets exist | Initialize R2 with a first immutable version and a latest manifest |
 | No local secrets exist | Fail by default |
+
+Shutdown push writes the encrypted version object first with an "if missing" condition, then advances the manifest with an "if match" condition. If another developer advanced the manifest after this AppHost pulled, push fails with a conflict instead of overwriting their version.
 
 ## Conflict Behavior
 
@@ -266,16 +325,17 @@ SecretSync keeps local baseline hashes in an internal state file, not in `secret
 %LOCALAPPDATA%\AditiKraft\Aspire\SecretSync\{apphost-identity}\{object-key-hash}\state.json
 ```
 
-The state file stores SHA-256 hashes of the last materialized values by resource and key. It does not store plaintext secrets. This lets SecretSync distinguish "unchanged value that was pulled from R2" from "developer intentionally edited this value locally" while keeping AppHost/API/Web user-secrets files clean.
+The state file stores SHA-256 hashes of the last hydrated values by resource and key. It does not store plaintext secrets. This lets SecretSync distinguish "unchanged value that was pulled from R2" from "developer intentionally edited this value locally" while keeping AppHost/API/Web user-secrets files clean.
 
 Scenarios:
 
 | Scenario | Behavior |
 |---|---|
-| Add new key in API user-secrets | Added to `resources.api` and pushed |
-| Change existing API key after pull | Local edit wins if R2 still matches the materialized baseline |
-| Same key changed on another machine too | Conflict is raised |
-| Add new key outside `SecretSync` in AppHost user-secrets | Added to `resources.apphost` and pushed |
+| Add new key in API user-secrets | Added to `resources.api` and pushed as a new vault version |
+| Change existing API key after pull | Local edit wins if the manifest still points at the revision this AppHost pulled |
+| Another machine advanced the manifest | Push fails; pull and merge before creating another version |
+| Same key changed on another machine too | Conflict is raised during pull/merge when the remote value and local edit both changed from baseline |
+| Add new key outside `SecretSync` in AppHost user-secrets | Added to `resources.apphost` and pushed as a new vault version |
 | Add key inside `SecretSync` | Treated as control config, not synced as secret data |
 | Delete a key locally | Delete semantics are not finalized; remote values may be restored |
 
@@ -297,6 +357,8 @@ remote now:       resources.api.Stripe.ApiKey = sk_remote_new
 result:           conflict
 ```
 
+Version history remains in R2 because previous vault objects are immutable. Rolling back means setting `VersionMode = SecretSyncVersionMode.Pinned` with the revision you want to inspect, then deciding whether to promote that content later through a normal latest-mode pull/push.
+
 ## Security Model
 
 R2 never receives plaintext secret values.
@@ -309,6 +371,7 @@ Argon2id key derivation
 Random salt per envelope
 Random nonce per encryption
 One encrypted JSON payload per AppHost vault
+Plaintext manifest contains only revision/object metadata, never secret values
 ```
 
 The encryption key must come from a password manager, environment variable, devcontainer secret, or local user-secrets bootstrap config. Do not commit it.
@@ -374,6 +437,9 @@ src/
     SecretSyncShutdownHostedService.cs
   Providers/
     R2SecretSyncProvider.cs
+  Remote/
+    SecretSyncManifest.cs
+    SecretSyncManifestSerializer.cs
   State/
     SecretSyncState.cs
     SecretSyncStateStore.cs

@@ -183,7 +183,7 @@ public static class SecretSyncExtensions
             ? options.UserSecretsId
             : options.ProjectId;
 
-        return $"aspire/apphosts/{NormalizeObjectKeySegment(identity)}/secretsync.vault.json";
+        return $"aspire/apphosts/{NormalizeObjectKeySegment(identity)}/latest.json";
     }
 
     private static string NormalizeObjectKeySegment(string value)

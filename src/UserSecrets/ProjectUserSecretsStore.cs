@@ -13,6 +13,7 @@ internal sealed class ProjectUserSecretsStore(
     {
         var resources = new Dictionary<string, Dictionary<string, string?>>(StringComparer.OrdinalIgnoreCase);
         var edits = new List<SecretSyncLocalEdit>();
+        bool hasMissingBaselineValues = false;
 
         foreach (ProjectUserSecretsSource source in options.ProjectUserSecretsSources)
         {
@@ -35,9 +36,36 @@ internal sealed class ProjectUserSecretsStore(
             }
 
             edits.AddRange(result.Edits);
+            hasMissingBaselineValues |= result.HasMissingBaselineValues;
         }
 
-        return new ProjectUserSecretsReadResult(resources, edits);
+        return new ProjectUserSecretsReadResult(resources, edits, hasMissingBaselineValues);
+    }
+
+    public async Task<IReadOnlyDictionary<string, Dictionary<string, string?>>> ReadAllResourcesAsync(
+        CancellationToken cancellationToken)
+    {
+        var resources = new Dictionary<string, Dictionary<string, string?>>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (ProjectUserSecretsSource source in options.ProjectUserSecretsSources)
+        {
+            string userSecretsId = ProjectUserSecretsResolver.GetRequiredUserSecretsId(source.ProjectPath);
+            IReadOnlyDictionary<string, string?> values = await userSecretsStore.ReadAsync(userSecretsId, cancellationToken);
+            Dictionary<string, string?> resource = UserSecretsMaterializer.ReadResourceValues(values);
+
+            if (!resources.TryGetValue(source.ResourceName, out Dictionary<string, string?>? resourceValues))
+            {
+                resourceValues = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
+                resources[source.ResourceName] = resourceValues;
+            }
+
+            foreach ((string key, string? value) in resource)
+            {
+                resourceValues[key] = value;
+            }
+        }
+
+        return resources;
     }
 
     public async Task MergeVaultAsync(
@@ -74,4 +102,5 @@ internal sealed class ProjectUserSecretsStore(
 
 internal sealed record ProjectUserSecretsReadResult(
     IReadOnlyDictionary<string, Dictionary<string, string?>> Resources,
-    IReadOnlyList<SecretSyncLocalEdit> Edits);
+    IReadOnlyList<SecretSyncLocalEdit> Edits,
+    bool HasMissingBaselineValues);
