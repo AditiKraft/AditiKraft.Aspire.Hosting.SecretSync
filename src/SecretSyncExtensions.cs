@@ -8,6 +8,7 @@ using AditiKraft.Aspire.Hosting.SecretSync.Providers;
 using AditiKraft.Aspire.Hosting.SecretSync.State;
 using AditiKraft.Aspire.Hosting.SecretSync.UserSecrets;
 using Aspire.Hosting;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Configuration.UserSecrets;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -21,6 +22,36 @@ public static class SecretSyncExtensions
         Action<SecretSyncOptions> configure)
     {
         return AddSecretSyncAsync(builder, configure).ConfigureAwait(false).GetAwaiter().GetResult();
+    }
+
+    public static SecretSyncHandle AddSecretSync(
+        this IDistributedApplicationBuilder builder,
+        IConfiguration configuration,
+        Action<SecretSyncOptions>? configure = null)
+    {
+        return AddSecretSyncAsync(builder, configuration, configure).ConfigureAwait(false).GetAwaiter().GetResult();
+    }
+
+    public static Task<SecretSyncHandle> AddSecretSyncAsync(
+        this IDistributedApplicationBuilder builder,
+        IConfiguration configuration,
+        Action<SecretSyncOptions>? configure = null,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(configuration);
+
+        return AddSecretSyncAsync(
+            builder,
+            options =>
+            {
+                // Bind EncryptionKey, S3, and other simple options straight from the
+                // SecretSync configuration section, then let the caller add the
+                // code-only mappings (MapAppHostSecrets / MapProjectUserSecrets<T>)
+                // that cannot be expressed in configuration.
+                configuration.Bind(options);
+                configure?.Invoke(options);
+            },
+            cancellationToken);
     }
 
     public static async Task<SecretSyncHandle> AddSecretSyncAsync(

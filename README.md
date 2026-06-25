@@ -44,19 +44,8 @@ var secretSync = builder.Configuration.GetSection("SecretSync");
 
 if (secretSync.GetValue("Enabled", false))
 {
-    var s3 = secretSync.GetSection("S3");
-
-    await builder.AddSecretSyncAsync(options =>
+    await builder.AddSecretSyncAsync(secretSync, options =>
     {
-        options.EncryptionKey = secretSync["EncryptionKey"] ?? "";
-
-        options.S3.BucketName = s3["BucketName"] ?? "";
-        options.S3.ManifestKey = s3["ManifestKey"] ?? "";
-        options.S3.Endpoint = s3["Endpoint"] ?? "";
-        options.S3.AccessKeyId = s3["AccessKeyId"] ?? "";
-        options.S3.SecretAccessKey = s3["SecretAccessKey"] ?? "";
-        options.S3.Region = s3["Region"] ?? "us-east-1";
-
         options.MapAppHostSecrets("apphost");
         options.MapProjectUserSecrets<Projects.ApiService>("api");
         options.MapProjectUserSecrets<Projects.Web>("web");
@@ -244,9 +233,71 @@ Available modes:
 - The S3-compatible provider receives encrypted vault bytes, not plaintext secret values.
 - Local baseline state stores hashes, not plaintext secrets.
 
+## Configuring Options
+
+There are two ways to configure SecretSync. Both are fully supported, so pick
+whichever you prefer.
+
+### Bind from configuration (recommended)
+
+Pass the `SecretSync` config section. `EncryptionKey` and everything under `S3`
+are bound for you. Only the project mappings stay in code, because they
+reference generated `Projects.*` types:
+
+```csharp
+var secretSync = builder.Configuration.GetSection("SecretSync");
+
+await builder.AddSecretSyncAsync(secretSync, options =>
+{
+    options.MapAppHostSecrets("apphost");
+    options.MapProjectUserSecrets<Projects.ApiService>("api");
+    options.MapProjectUserSecrets<Projects.Web>("web");
+});
+```
+
+### Configure everything in code
+
+If you would rather wire each value yourself, use the `configure`-only overload:
+
+```csharp
+var secretSync = builder.Configuration.GetSection("SecretSync");
+var s3 = secretSync.GetSection("S3");
+
+await builder.AddSecretSyncAsync(options =>
+{
+    options.EncryptionKey = secretSync["EncryptionKey"] ?? "";
+
+    options.S3.BucketName = s3["BucketName"] ?? "";
+    options.S3.ManifestKey = s3["ManifestKey"] ?? "";
+    options.S3.Endpoint = s3["Endpoint"] ?? "";
+    options.S3.AccessKeyId = s3["AccessKeyId"] ?? "";
+    options.S3.SecretAccessKey = s3["SecretAccessKey"] ?? "";
+    options.S3.Region = s3["Region"] ?? "us-east-1";
+
+    options.MapAppHostSecrets("apphost");
+    options.MapProjectUserSecrets<Projects.ApiService>("api");
+    options.MapProjectUserSecrets<Projects.Web>("web");
+});
+```
+
+### Mix both
+
+With the config-binding overload, `configure` runs *after* the bind, so you can
+bind from config and still override individual values in code:
+
+```csharp
+await builder.AddSecretSyncAsync(secretSync, options =>
+{
+    options.S3.Region = "auto";          // override a bound value
+    options.MapAppHostSecrets("apphost");
+});
+```
+
 ## API
 
-- `AddSecretSyncAsync(...)`
+- `AddSecretSyncAsync(configurationSection, configure)` — binds `EncryptionKey` and `S3` from the config section, then applies the code-only mappings in `configure`.
+- `AddSecretSyncAsync(configure)` — configure every option in code.
+- `AddSecretSync(...)` — synchronous overloads of the above.
 - `MapAppHostSecrets(resourceName)`
 - `MapProjectUserSecrets<TProject>(resourceName)`
 - `MapProjectUserSecrets(resourceName, projectPath)`

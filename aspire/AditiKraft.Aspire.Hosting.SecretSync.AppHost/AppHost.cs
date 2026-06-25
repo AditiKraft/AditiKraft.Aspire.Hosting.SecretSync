@@ -6,19 +6,8 @@ var secretSync = builder.Configuration.GetSection("SecretSync");
 
 if (secretSync.GetValue("Enabled", false))
 {
-    var s3 = secretSync.GetSection("S3");
-
-    await builder.AddSecretSyncAsync(options =>
+    await builder.AddSecretSyncAsync(secretSync, options =>
     {
-        options.EncryptionKey = secretSync["EncryptionKey"] ?? "";
-
-        options.S3.BucketName = s3["BucketName"] ?? "";
-        options.S3.ManifestKey = s3["ManifestKey"] ?? "";
-        options.S3.Endpoint = s3["Endpoint"] ?? "";
-        options.S3.AccessKeyId = s3["AccessKeyId"] ?? "";
-        options.S3.SecretAccessKey = s3["SecretAccessKey"] ?? "";
-        options.S3.Region = s3["Region"] ?? "us-east-1";
-
         options.MapAppHostSecrets("apphost");
         options.MapProjectUserSecrets<Projects.AditiKraft_Aspire_Hosting_SecretSync_ApiService>("api");
         options.MapProjectUserSecrets<Projects.AditiKraft_Aspire_Hosting_SecretSync_Web>("web");
