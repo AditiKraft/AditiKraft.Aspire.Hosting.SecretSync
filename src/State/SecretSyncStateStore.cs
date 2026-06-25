@@ -58,17 +58,19 @@ internal sealed class SecretSyncStateStore(SecretSyncOptions options)
         }
 
         string tempPath = $"{path}.{Guid.NewGuid():N}.tmp";
-        await File.WriteAllTextAsync(
-            tempPath,
-            JsonSerializer.Serialize(state, _jsonOptions),
-            cancellationToken);
-
-        if (File.Exists(path))
+        try
         {
-            File.Delete(path);
+            await File.WriteAllTextAsync(
+                tempPath,
+                JsonSerializer.Serialize(state, _jsonOptions),
+                cancellationToken);
+            File.Move(tempPath, path, overwrite: true);
         }
-
-        File.Move(tempPath, path);
+        catch
+        {
+            TryDeleteTempFile(tempPath);
+            throw;
+        }
     }
 
     private string GetStatePath()
@@ -106,6 +108,21 @@ internal sealed class SecretSyncStateStore(SecretSyncOptions options)
         string key = $"{options.S3.BucketName}|{options.S3.ManifestKey}";
         string hash = SecretValueHasher.Hash(key).ToLowerInvariant();
         return hash[..Math.Min(hash.Length, 16)];
+    }
+
+    private static void TryDeleteTempFile(string tempPath)
+    {
+        try
+        {
+            if (File.Exists(tempPath))
+            {
+                File.Delete(tempPath);
+            }
+        }
+        catch
+        {
+            // Best-effort cleanup of the temp file; the original write failure is rethrown by the caller.
+        }
     }
 
     private static string NormalizePathSegment(string value)

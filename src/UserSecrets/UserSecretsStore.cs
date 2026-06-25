@@ -140,14 +140,31 @@ internal sealed class UserSecretsStore(SecretSyncOptions options)
         }
 
         string tempPath = $"{path}.{Guid.NewGuid():N}.tmp";
-        await File.WriteAllTextAsync(tempPath, root.ToJsonString(_jsonOptions), cancellationToken);
-
-        if (File.Exists(path))
+        try
         {
-            File.Delete(path);
+            await File.WriteAllTextAsync(tempPath, root.ToJsonString(_jsonOptions), cancellationToken);
+            File.Move(tempPath, path, overwrite: true);
         }
+        catch
+        {
+            TryDeleteTempFile(tempPath);
+            throw;
+        }
+    }
 
-        File.Move(tempPath, path);
+    private static void TryDeleteTempFile(string tempPath)
+    {
+        try
+        {
+            if (File.Exists(tempPath))
+            {
+                File.Delete(tempPath);
+            }
+        }
+        catch
+        {
+            // Best-effort cleanup of the temp file; the original write failure is rethrown by the caller.
+        }
     }
 
     private static string? TryGetSecretsPath(string userSecretsId)
