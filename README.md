@@ -141,6 +141,19 @@ Normal development:
 2. You edit AppHost or project user-secrets normally.
 3. Shutdown pushes a new encrypted version if values changed.
 
+> [!IMPORTANT]
+> The push happens during **graceful shutdown**. Stopping the AppHost normally
+> (Ctrl+C, SIGTERM, or the dashboard/IDE Stop button) runs the push as expected.
+> **Force-killing the process** (closing the terminal window abruptly, `kill -9`,
+> Task Manager → End Task) or a crash can skip the shutdown push, so your latest
+> local edits may not reach remote storage in that session.
+>
+> This is **not data loss**: your edits remain in your local user-secrets files.
+> SecretSync detects them on the next run, merges them, and pushes them on the
+> next graceful shutdown. The only effect of a forced stop is that the remote
+> stays stale until your next clean run. If you need edits shared immediately,
+> stop the AppHost gracefully before switching machines or sharing.
+
 ## Remote Storage
 
 If `S3:ManifestKey` is empty, SecretSync derives a manifest key from the AppHost user-secrets id:
