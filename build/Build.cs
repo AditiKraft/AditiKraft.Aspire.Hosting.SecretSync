@@ -25,7 +25,7 @@ class Build : NukeBuild
 
     [Parameter("Force release behavior for tag builds")] readonly bool ReleaseBuild;
     [Parameter("NuGet API Key for publishing templates")] private readonly string NuGetPAT;
-    [Parameter("Package version (default: 0.0.10)")] private readonly string PackageVersion = "0.0.14";
+    [Parameter("Package version (default: 0.0.10)")] private readonly string PackageVersion = "0.0.15";
 
     private AbsolutePath SampleProjectPath =>
         AspireDirectory / "AditiKraft.Aspire.Hosting.SecretSync.AppHost" / "AditiKraft.Aspire.Hosting.SecretSync.AppHost.csproj";
