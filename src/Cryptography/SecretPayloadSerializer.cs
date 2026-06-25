@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 
 namespace AditiKraft.Aspire.Hosting.SecretSync.Cryptography;
 
@@ -28,9 +29,54 @@ internal static class SecretPayloadSerializer
 
     public static string ComputeVaultHash(SecretSyncVault vault)
     {
-        byte[] bytes = JsonSerializer.SerializeToUtf8Bytes(vault, JsonOptions);
+        // Hash a canonical representation with keys sorted recursively. The vault is
+        // repeatedly flattened and unflattened during merges, so the same content can
+        // come back with a different key order. Hashing the raw serialization would
+        // then change even when nothing changed, causing spurious pushes. Sorting keys
+        // makes equal content always produce equal bytes.
+        var canonical = new JsonObject
+        {
+            ["version"] = vault.Version
+        };
+
+        var resources = new JsonObject();
+        foreach (string resourceName in vault.Resources.Keys.OrderBy(key => key, StringComparer.Ordinal))
+        {
+            resources[resourceName] = CanonicalizeNode(vault.Resources[resourceName]);
+        }
+
+        canonical["resources"] = resources;
+
+        byte[] bytes = Encoding.UTF8.GetBytes(canonical.ToJsonString());
         byte[] hash = SHA256.HashData(bytes);
         return Base64UrlEncode(hash);
+    }
+
+    private static JsonNode? CanonicalizeNode(JsonNode? node)
+    {
+        switch (node)
+        {
+            case JsonObject obj:
+                var sorted = new JsonObject();
+                foreach (string key in obj.Select(pair => pair.Key).OrderBy(key => key, StringComparer.Ordinal))
+                {
+                    sorted[key] = CanonicalizeNode(obj[key]);
+                }
+
+                return sorted;
+            case JsonArray array:
+                var ordered = new JsonArray();
+                for (int i = 0; i < array.Count; i++)
+                {
+                    ordered.Add(CanonicalizeNode(array[i]));
+                }
+
+                return ordered;
+            case null:
+                return null;
+            default:
+                return node.DeepClone();
+        }
     }
 
     public static string HashText(string value)
