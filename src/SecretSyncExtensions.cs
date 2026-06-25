@@ -1,4 +1,5 @@
 using System.Reflection;
+using System.Text;
 using AditiKraft.Aspire.Hosting.SecretSync.Abstractions;
 using AditiKraft.Aspire.Hosting.SecretSync.Configuration;
 using AditiKraft.Aspire.Hosting.SecretSync.Cryptography;
@@ -114,14 +115,22 @@ public static class SecretSyncExtensions
 
     private static string NormalizeObjectKeySegment(string value)
     {
-        string normalized = value.Trim().ToLowerInvariant();
-        char[] invalidChars = Path.GetInvalidFileNameChars();
+        // Use a fixed allowlist rather than Path.GetInvalidFileNameChars(), whose
+        // contents differ between Windows and Linux. An OS-dependent set would derive
+        // different manifest keys for the same identity across platforms, so teammates
+        // on different operating systems could point at different remote objects.
+        string trimmed = value.Trim().ToLowerInvariant();
+        var builder = new StringBuilder(trimmed.Length);
 
-        foreach (char invalidChar in invalidChars)
+        foreach (char c in trimmed)
         {
-            normalized = normalized.Replace(invalidChar, '-');
+            bool isAllowed = c is >= 'a' and <= 'z'
+                or >= '0' and <= '9'
+                or '-' or '_' or '.';
+            builder.Append(isAllowed ? c : '-');
         }
 
+        string normalized = builder.ToString();
         return string.IsNullOrWhiteSpace(normalized) ? "default" : normalized;
     }
 }
