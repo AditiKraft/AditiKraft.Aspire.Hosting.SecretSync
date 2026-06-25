@@ -51,4 +51,53 @@ public sealed class AesGcmSecretEncryptorTests
             "sk_api",
             payload.Vault.Resources["api"]["Stripe"]!["ApiKey"]!.GetValue<string>());
     }
+
+    [Fact]
+    public void Decrypt_RejectsOversizedKdfMemoryBeforeDerivingKey()
+    {
+        var options = new SecretSyncOptions { EncryptionKey = "unit-test-encryption-key" };
+        var encryptor = new AesGcmSecretEncryptor(options);
+
+        byte[] body = CreateEnvelopeBytesWithKdfMemory(2_000_000); // ~2 GiB request
+
+        InvalidOperationException exception = Assert.Throws<InvalidOperationException>(
+            () => encryptor.Decrypt(body));
+
+        Assert.Contains("KDF memory size", exception.Message);
+    }
+
+    [Fact]
+    public void Decrypt_RejectsInvalidKdfKeySize()
+    {
+        var options = new SecretSyncOptions { EncryptionKey = "unit-test-encryption-key" };
+        var encryptor = new AesGcmSecretEncryptor(options);
+
+        byte[] body = CreateEnvelopeBytesWithKdfMemory(1024, keySizeBytes: 20);
+
+        InvalidOperationException exception = Assert.Throws<InvalidOperationException>(
+            () => encryptor.Decrypt(body));
+
+        Assert.Contains("key size", exception.Message);
+    }
+
+    private static byte[] CreateEnvelopeBytesWithKdfMemory(int memorySizeKiB, int keySizeBytes = 32)
+    {
+        var envelope = new SecretEnvelope
+        {
+            Kdf = new KdfEnvelope
+            {
+                Salt = Convert.ToBase64String(new byte[16]),
+                MemorySizeKiB = memorySizeKiB,
+                Iterations = 1,
+                DegreeOfParallelism = 1,
+                KeySizeBytes = keySizeBytes
+            },
+            Nonce = Convert.ToBase64String(new byte[12]),
+            Tag = Convert.ToBase64String(new byte[16]),
+            Ciphertext = "",
+            Revision = "test-revision"
+        };
+
+        return SecretPayloadSerializer.SerializeEnvelope(envelope);
+    }
 }

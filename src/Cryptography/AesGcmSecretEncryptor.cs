@@ -5,6 +5,14 @@ namespace AditiKraft.Aspire.Hosting.SecretSync.Cryptography;
 
 internal sealed class AesGcmSecretEncryptor(SecretSyncOptions options)
 {
+    // Upper bounds applied to KDF parameters read from an untrusted vault blob.
+    // The parameters drive an Argon2 allocation that runs before the ciphertext is
+    // authenticated, so an unbounded MemorySizeKiB would let a malformed or hostile
+    // blob exhaust memory. These caps are well above any sane real configuration.
+    private const int MaxMemorySizeKiB = 1024 * 1024; // 1 GiB
+    private const int MaxIterations = 20;
+    private const int MaxDegreeOfParallelism = 16;
+
     private readonly Argon2idKeyDeriver _keyDeriver = new();
 
     public SecretEnvelope Encrypt(SecretSyncVault vault, string? parentRevision)
@@ -63,6 +71,7 @@ internal sealed class AesGcmSecretEncryptor(SecretSyncOptions options)
     public SecretPayload Decrypt(byte[] body)
     {
         SecretEnvelope envelope = SecretPayloadSerializer.DeserializeEnvelope(body);
+        ValidateKdf(envelope.Kdf);
         byte[] salt = Convert.FromBase64String(envelope.Kdf.Salt);
         byte[] nonce = Convert.FromBase64String(envelope.Nonce);
         byte[] tag = Convert.FromBase64String(envelope.Tag);
@@ -92,6 +101,33 @@ internal sealed class AesGcmSecretEncryptor(SecretSyncOptions options)
 
     public byte[] SerializeEnvelope(SecretEnvelope envelope) =>
         SecretPayloadSerializer.SerializeEnvelope(envelope);
+
+    private static void ValidateKdf(KdfEnvelope kdf)
+    {
+        if (kdf.MemorySizeKiB is < 8 or > MaxMemorySizeKiB)
+        {
+            throw new InvalidOperationException(
+                $"SecretSync KDF memory size ({kdf.MemorySizeKiB} KiB) is outside the allowed range of 8 to {MaxMemorySizeKiB} KiB.");
+        }
+
+        if (kdf.Iterations is < 1 or > MaxIterations)
+        {
+            throw new InvalidOperationException(
+                $"SecretSync KDF iteration count ({kdf.Iterations}) is outside the allowed range of 1 to {MaxIterations}.");
+        }
+
+        if (kdf.DegreeOfParallelism is < 1 or > MaxDegreeOfParallelism)
+        {
+            throw new InvalidOperationException(
+                $"SecretSync KDF degree of parallelism ({kdf.DegreeOfParallelism}) is outside the allowed range of 1 to {MaxDegreeOfParallelism}.");
+        }
+
+        if (kdf.KeySizeBytes is not (16 or 24 or 32))
+        {
+            throw new InvalidOperationException(
+                $"SecretSync KDF key size ({kdf.KeySizeBytes} bytes) must be 16, 24, or 32.");
+        }
+    }
 
     private static byte[] CreateAssociatedData(SecretEnvelope envelope)
     {
