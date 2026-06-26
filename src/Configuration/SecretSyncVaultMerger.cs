@@ -20,7 +20,7 @@ internal static class SecretSyncVaultMerger
             return local;
         }
 
-        var merged = new SecretSyncVault
+        SecretSyncVault merged = new()
         {
             Version = remote.Version
         };
@@ -62,7 +62,7 @@ internal static class SecretSyncVaultMerger
     {
         Dictionary<string, string?> remoteValues = VaultFlattener.Flatten(remote);
         Dictionary<string, string?> localValues = VaultFlattener.Flatten(local);
-        var merged = new Dictionary<string, string?>(remoteValues, StringComparer.OrdinalIgnoreCase);
+        Dictionary<string, string?> merged = new(remoteValues, StringComparer.OrdinalIgnoreCase);
 
         foreach ((string key, string? localValue) in localValues)
         {
@@ -84,20 +84,13 @@ internal static class SecretSyncVaultMerger
                 continue;
             }
 
-            switch (conflictMode)
+            merged[key] = conflictMode switch
             {
-                case SecretSyncConflictMode.PullWins:
-                    merged[key] = remoteValue;
-                    break;
-                case SecretSyncConflictMode.PushWins:
-                    merged[key] = localValue;
-                    break;
-                case SecretSyncConflictMode.MergeNonOverlapping:
-                case SecretSyncConflictMode.Fail:
-                default:
-                    throw new SecretSyncConflictException(
-                        $"SecretSync conflict in {area} for key '{key}'. Local and remote values differ. Resolve the local secrets.json file or choose PullWins/PushWins explicitly.");
-            }
+                SecretSyncConflictMode.PullWins => remoteValue,
+                SecretSyncConflictMode.PushWins => localValue,
+                _ => throw new SecretSyncConflictException(
+                                        $"SecretSync conflict in {area} for key '{key}'. Local and remote values differ. Resolve the local secrets.json file or choose PullWins/PushWins explicitly."),
+            };
         }
 
         return VaultFlattener.Unflatten(merged);
@@ -106,7 +99,7 @@ internal static class SecretSyncVaultMerger
     private static Dictionary<string, SecretSyncLocalEdit> CreateLocalEditIndex(
         IReadOnlyList<SecretSyncLocalEdit>? localEdits)
     {
-        var index = new Dictionary<string, SecretSyncLocalEdit>(StringComparer.OrdinalIgnoreCase);
+        Dictionary<string, SecretSyncLocalEdit> index = new(StringComparer.OrdinalIgnoreCase);
         if (localEdits is null)
         {
             return index;

@@ -19,13 +19,13 @@ internal sealed class AesGcmSecretEncryptor(SecretSyncOptions options)
     {
         byte[] salt = RandomNumberGenerator.GetBytes(options.KeyDerivation.SaltSizeBytes);
         byte[] nonce = RandomNumberGenerator.GetBytes(12);
-        byte[] key = _keyDeriver.DeriveKey(options.EncryptionKey, salt, options.KeyDerivation);
+        byte[] key = Argon2idKeyDeriver.DeriveKey(options.EncryptionKey, salt, options.KeyDerivation);
         byte[] plaintext = [];
 
         try
         {
             string revision = CreateRevision();
-            var payload = new SecretPayload
+            SecretPayload payload = new()
             {
                 ProjectId = options.ProjectId,
                 ContentHash = SecretPayloadSerializer.ComputeVaultHash(vault),
@@ -36,7 +36,7 @@ internal sealed class AesGcmSecretEncryptor(SecretSyncOptions options)
             byte[] ciphertext = new byte[plaintext.Length];
             byte[] tag = new byte[16];
 
-            var envelope = new SecretEnvelope
+            SecretEnvelope envelope = new()
             {
                 Kdf = new KdfEnvelope
                 {
@@ -54,7 +54,7 @@ internal sealed class AesGcmSecretEncryptor(SecretSyncOptions options)
                 UpdatedBy = CreateUpdatedBy()
             };
 
-            using var aes = new AesGcm(key, tag.Length);
+            using AesGcm aes = new(key, tag.Length);
             aes.Encrypt(nonce, plaintext, ciphertext, tag, CreateAssociatedData(envelope));
 
             envelope.Ciphertext = Convert.ToBase64String(ciphertext);
@@ -76,7 +76,7 @@ internal sealed class AesGcmSecretEncryptor(SecretSyncOptions options)
         byte[] nonce = Convert.FromBase64String(envelope.Nonce);
         byte[] tag = Convert.FromBase64String(envelope.Tag);
         byte[] ciphertext = Convert.FromBase64String(envelope.Ciphertext);
-        byte[] key = _keyDeriver.DeriveKey(options.EncryptionKey, salt, new Argon2idOptions
+        byte[] key = Argon2idKeyDeriver.DeriveKey(options.EncryptionKey, salt, new Argon2idOptions
         {
             MemorySizeKiB = envelope.Kdf.MemorySizeKiB,
             Iterations = envelope.Kdf.Iterations,
@@ -88,7 +88,7 @@ internal sealed class AesGcmSecretEncryptor(SecretSyncOptions options)
 
         try
         {
-            using var aes = new AesGcm(key, tag.Length);
+            using AesGcm aes = new(key, tag.Length);
             aes.Decrypt(nonce, ciphertext, tag, plaintext, CreateAssociatedData(envelope));
             return SecretPayloadSerializer.DeserializePayload(plaintext);
         }
@@ -99,7 +99,7 @@ internal sealed class AesGcmSecretEncryptor(SecretSyncOptions options)
         }
     }
 
-    public byte[] SerializeEnvelope(SecretEnvelope envelope) =>
+    public static byte[] SerializeEnvelope(SecretEnvelope envelope) =>
         SecretPayloadSerializer.SerializeEnvelope(envelope);
 
     private static void ValidateKdf(KdfEnvelope kdf)

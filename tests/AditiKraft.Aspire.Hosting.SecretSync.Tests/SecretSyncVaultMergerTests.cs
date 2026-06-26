@@ -8,14 +8,14 @@ public sealed class SecretSyncVaultMergerTests
     [Fact]
     public void MergeRemoteWithLocal_FillsMissingAndPreservesLocalAdditions()
     {
-        var remote = new SecretSyncVault
+        SecretSyncVault remote = new()
         {
             Resources =
             {
                 ["api"] = JsonNode.Parse("""{ "Stripe": { "ApiKey": "sk_remote" } }""")!.AsObject()
             }
         };
-        var local = new SecretSyncVault
+        SecretSyncVault local = new()
         {
             Resources =
             {
@@ -35,14 +35,14 @@ public sealed class SecretSyncVaultMergerTests
     [Fact]
     public void MergeRemoteWithLocal_FailsWhenSameKeyDiffersByDefault()
     {
-        var remote = new SecretSyncVault
+        SecretSyncVault remote = new()
         {
             Resources =
             {
                 ["api"] = JsonNode.Parse("""{ "Stripe": { "ApiKey": "sk_remote" } }""")!.AsObject()
             }
         };
-        var local = new SecretSyncVault
+        SecretSyncVault local = new()
         {
             Resources =
             {
@@ -57,14 +57,14 @@ public sealed class SecretSyncVaultMergerTests
     [Fact]
     public void MergeRemoteWithLocal_AllowsLocalEditWhenRemoteStillMatchesBaseline()
     {
-        var remote = new SecretSyncVault
+        SecretSyncVault remote = new()
         {
             Resources =
             {
                 ["api"] = JsonNode.Parse("""{ "Stripe": { "ApiKey": "sk_old" } }""")!.AsObject()
             }
         };
-        var local = new SecretSyncVault
+        SecretSyncVault local = new()
         {
             Resources =
             {
@@ -84,14 +84,14 @@ public sealed class SecretSyncVaultMergerTests
     [Fact]
     public void MergeRemoteWithLocal_FailsLocalEditWhenRemoteChangedSinceMaterialization()
     {
-        var remote = new SecretSyncVault
+        SecretSyncVault remote = new()
         {
             Resources =
             {
                 ["api"] = JsonNode.Parse("""{ "Stripe": { "ApiKey": "sk_remote_new" } }""")!.AsObject()
             }
         };
-        var local = new SecretSyncVault
+        SecretSyncVault local = new()
         {
             Resources =
             {

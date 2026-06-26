@@ -26,6 +26,7 @@ public sealed class SecretSyncOptions
     public IList<ProjectUserSecretsSource> ProjectUserSecretsSources { get; } = [];
 
     public SecretSyncConflictMode ConflictMode { get; set; } = SecretSyncConflictMode.Fail;
+
     public SecretSyncPrecedence ConfigurationPrecedence { get; set; } =
         SecretSyncPrecedence.BelowEnvironmentAndCommandLine;
 
@@ -46,7 +47,7 @@ public sealed class SecretSyncOptions
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(resourceName);
 
-        var metadata = new TProject();
+        TProject metadata = new();
         ProjectUserSecretsSources.Add(new ProjectUserSecretsSource(resourceName, metadata.ProjectPath));
         return this;
     }

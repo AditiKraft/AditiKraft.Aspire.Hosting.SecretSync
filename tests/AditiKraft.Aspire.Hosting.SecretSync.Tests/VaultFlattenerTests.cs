@@ -8,7 +8,7 @@ public sealed class VaultFlattenerTests
     [Fact]
     public void Flatten_UsesConfigurationPathsForNestedJson()
     {
-        var json = JsonNode.Parse("""
+        JsonObject json = JsonNode.Parse("""
             {
               "Stripe": {
                 "ApiKey": "sk_api"
@@ -30,7 +30,7 @@ public sealed class VaultFlattenerTests
     [Fact]
     public void Unflatten_RestoresNestedJson()
     {
-        var values = new Dictionary<string, string?>
+        Dictionary<string, string?> values = new()
         {
             ["Stripe:ApiKey"] = "sk_api",
             ["Auth:Google:ClientSecret"] = "secret"

@@ -1,5 +1,5 @@
-using AditiKraft.Aspire.Hosting.SecretSync.UserSecrets;
 using AditiKraft.Aspire.Hosting.SecretSync.State;
+using AditiKraft.Aspire.Hosting.SecretSync.UserSecrets;
 
 namespace AditiKraft.Aspire.Hosting.SecretSync.Configuration;
 
@@ -22,8 +22,8 @@ internal sealed class SecretSnapshotBuilder(
             return new SecretSyncLocalSnapshot(new SecretSyncVault(), [], HasMissingBaselineValues: false);
         }
 
-        var vault = new SecretSyncVault();
-        var edits = new List<SecretSyncLocalEdit>();
+        SecretSyncVault vault = new();
+        List<SecretSyncLocalEdit> edits = [];
         bool hasMissingBaselineValues = false;
         SecretSyncState state = await stateStore.ReadAsync(cancellationToken);
 
@@ -76,7 +76,7 @@ internal sealed class SecretSnapshotBuilder(
 
     public async Task<SecretSyncVault> BuildFullLocalVaultAsync(CancellationToken cancellationToken)
     {
-        var vault = new SecretSyncVault();
+        SecretSyncVault vault = new();
 
         if (options.ReadFromUserSecrets)
         {

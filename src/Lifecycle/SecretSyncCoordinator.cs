@@ -124,11 +124,11 @@ internal sealed class SecretSyncCoordinator(
         }
 
         SecretEnvelope envelope = encryptor.Encrypt(localVault, handle.RemoteRevision);
-        byte[] body = encryptor.SerializeEnvelope(envelope);
+        byte[] body = AesGcmSecretEncryptor.SerializeEnvelope(envelope);
         string versionObjectKey = CreateVersionObjectKey(envelope.Revision);
         await PutVersionAsync(versionObjectKey, body, envelope, cancellationToken);
 
-        var nextManifest = new SecretSyncManifest
+        SecretSyncManifest nextManifest = new()
         {
             LatestRevision = envelope.Revision,
             ParentRevision = envelope.ParentRevision,
@@ -199,7 +199,7 @@ internal sealed class SecretSyncCoordinator(
         SecretSyncRemoteObject remoteVault = await GetRequiredVaultAsync(versionObjectKey, cancellationToken);
         SecretPayload payload = encryptor.Decrypt(remoteVault.Body);
 
-        var remoteState = new SecretSyncRemoteState
+        SecretSyncRemoteState remoteState = new()
         {
             Revision = options.PinnedRevision,
             ContentHash = payload.ContentHash,
@@ -273,13 +273,13 @@ internal sealed class SecretSyncCoordinator(
         CancellationToken cancellationToken)
     {
         SecretEnvelope envelope = encryptor.Encrypt(localVault, parentRevision: null);
-        byte[] body = encryptor.SerializeEnvelope(envelope);
+        byte[] body = AesGcmSecretEncryptor.SerializeEnvelope(envelope);
         string localHash = SecretPayloadSerializer.ComputeVaultHash(localVault);
         string versionObjectKey = CreateVersionObjectKey(envelope.Revision);
 
         await PutVersionAsync(versionObjectKey, body, envelope, cancellationToken);
 
-        var manifest = new SecretSyncManifest
+        SecretSyncManifest manifest = new()
         {
             LatestRevision = envelope.Revision,
             ParentRevision = null,
@@ -416,12 +416,7 @@ internal sealed class SecretSyncCoordinator(
     {
         SecretSyncRemoteObject? remote = await provider.GetAsync(
             CreateContext(objectKey),
-            cancellationToken);
-        if (remote is null)
-        {
-            throw new InvalidOperationException($"SecretSync vault object '{objectKey}' was not found.");
-        }
-
+            cancellationToken) ?? throw new InvalidOperationException($"SecretSync vault object '{objectKey}' was not found.");
         return remote;
     }
 

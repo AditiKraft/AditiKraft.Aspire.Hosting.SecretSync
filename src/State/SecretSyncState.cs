@@ -4,6 +4,7 @@ internal sealed class SecretSyncState
 {
     public int Version { get; set; } = 1;
     public SecretSyncRemoteState Remote { get; set; } = new();
+
     public Dictionary<string, Dictionary<string, string>> Resources { get; set; } =
         new(StringComparer.OrdinalIgnoreCase);
 

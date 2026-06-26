@@ -33,7 +33,7 @@ internal sealed class SecretSyncStateStore(SecretSyncOptions options)
         SecretSyncRemoteState? remote,
         CancellationToken cancellationToken)
     {
-        var state = new SecretSyncState();
+        SecretSyncState state = new();
         if (remote is not null)
         {
             state.Remote = remote;
@@ -41,7 +41,7 @@ internal sealed class SecretSyncStateStore(SecretSyncOptions options)
 
         foreach ((string resourceName, System.Text.Json.Nodes.JsonObject resource) in vault.Resources)
         {
-            var hashes = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            Dictionary<string, string> hashes = new(StringComparer.OrdinalIgnoreCase);
             foreach ((string key, string? value) in VaultFlattener.Flatten(resource))
             {
                 hashes[key] = SecretValueHasher.Hash(value);
@@ -145,7 +145,7 @@ internal sealed class SecretSyncStateStore(SecretSyncOptions options)
             return new SecretSyncState();
         }
 
-        var normalized = new SecretSyncState
+        SecretSyncState normalized = new()
         {
             Version = state.Version,
             Remote = state.Remote ?? new SecretSyncRemoteState()

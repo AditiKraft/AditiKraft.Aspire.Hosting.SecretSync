@@ -18,7 +18,7 @@ internal sealed class UserSecretsStore(SecretSyncOptions options)
         return await ReadPathAsync(path, cancellationToken);
     }
 
-    public async Task<IReadOnlyDictionary<string, string?>> ReadAsync(
+    public static async Task<IReadOnlyDictionary<string, string?>> ReadAsync(
         string userSecretsId,
         CancellationToken cancellationToken)
     {
@@ -26,7 +26,7 @@ internal sealed class UserSecretsStore(SecretSyncOptions options)
         return await ReadPathAsync(path, cancellationToken);
     }
 
-    public async Task MergeAsync(
+    public static async Task MergeAsync(
         string userSecretsId,
         IReadOnlyDictionary<string, string?> values,
         bool overwriteExisting,
@@ -59,7 +59,7 @@ internal sealed class UserSecretsStore(SecretSyncOptions options)
         await WritePathAsync(path, current, cancellationToken);
     }
 
-    public async Task WriteAsync(
+    public static async Task WriteAsync(
         string userSecretsId,
         IReadOnlyDictionary<string, string?> values,
         CancellationToken cancellationToken)
@@ -71,25 +71,6 @@ internal sealed class UserSecretsStore(SecretSyncOptions options)
         }
 
         await WritePathAsync(path, values, cancellationToken);
-    }
-
-    private static async Task<IReadOnlyDictionary<string, string?>> ReadPathAsync(
-        string? path,
-        CancellationToken cancellationToken)
-    {
-        if (path is null || !File.Exists(path))
-        {
-            return new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
-        }
-
-        await using FileStream stream = File.OpenRead(path);
-        JsonNode? node = await JsonNode.ParseAsync(stream, cancellationToken: cancellationToken);
-        if (node is not JsonObject root)
-        {
-            return new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
-        }
-
-        return VaultFlattener.Flatten(root);
     }
 
     public async Task MergeVaultAsync(
@@ -125,6 +106,25 @@ internal sealed class UserSecretsStore(SecretSyncOptions options)
 
         UserSecretsMaterializer.Materialize(current, appHostValues, baselineHashes);
         await WritePathAsync(path, current, cancellationToken);
+    }
+
+    private static async Task<IReadOnlyDictionary<string, string?>> ReadPathAsync(
+        string? path,
+        CancellationToken cancellationToken)
+    {
+        if (path is null || !File.Exists(path))
+        {
+            return new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
+        }
+
+        await using FileStream stream = File.OpenRead(path);
+        JsonNode? node = await JsonNode.ParseAsync(stream, cancellationToken: cancellationToken);
+        if (node is not JsonObject root)
+        {
+            return new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
+        }
+
+        return VaultFlattener.Flatten(root);
     }
 
     private static async Task WritePathAsync(

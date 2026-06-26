@@ -10,8 +10,8 @@ internal sealed class SecretSyncShutdownHostedService(
 
     public async Task StopAsync(CancellationToken cancellationToken)
     {
-        using var timeout = new CancellationTokenSource(options.ShutdownTimeout);
-        using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeout.Token);
+        using CancellationTokenSource timeout = new(options.ShutdownTimeout);
+        using CancellationTokenSource linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeout.Token);
         await coordinator.PushAsync(linked.Token);
     }
 }

@@ -8,7 +8,7 @@ public sealed class AesGcmSecretEncryptorTests
     [Fact]
     public void EncryptThenDecrypt_RoundTripsVault()
     {
-        var options = new SecretSyncOptions
+        SecretSyncOptions options = new()
         {
             EncryptionKey = "unit-test-encryption-key",
             ProjectId = "unit-tests"
@@ -17,7 +17,7 @@ public sealed class AesGcmSecretEncryptorTests
         options.KeyDerivation.Iterations = 1;
         options.KeyDerivation.DegreeOfParallelism = 1;
 
-        var vault = new SecretSyncVault
+        SecretSyncVault vault = new()
         {
             Resources =
             {
@@ -38,7 +38,7 @@ public sealed class AesGcmSecretEncryptorTests
             }
         };
 
-        var encryptor = new AesGcmSecretEncryptor(options);
+        AesGcmSecretEncryptor encryptor = new(options);
 
         SecretEnvelope envelope = encryptor.Encrypt(vault, parentRevision: null);
         SecretPayload payload = encryptor.Decrypt(encryptor.SerializeEnvelope(envelope));
@@ -55,8 +55,8 @@ public sealed class AesGcmSecretEncryptorTests
     [Fact]
     public void Decrypt_RejectsOversizedKdfMemoryBeforeDerivingKey()
     {
-        var options = new SecretSyncOptions { EncryptionKey = "unit-test-encryption-key" };
-        var encryptor = new AesGcmSecretEncryptor(options);
+        SecretSyncOptions options = new() { EncryptionKey = "unit-test-encryption-key" };
+        AesGcmSecretEncryptor encryptor = new(options);
 
         byte[] body = CreateEnvelopeBytesWithKdfMemory(2_000_000); // ~2 GiB request
 
@@ -69,8 +69,8 @@ public sealed class AesGcmSecretEncryptorTests
     [Fact]
     public void Decrypt_RejectsInvalidKdfKeySize()
     {
-        var options = new SecretSyncOptions { EncryptionKey = "unit-test-encryption-key" };
-        var encryptor = new AesGcmSecretEncryptor(options);
+        SecretSyncOptions options = new() { EncryptionKey = "unit-test-encryption-key" };
+        AesGcmSecretEncryptor encryptor = new(options);
 
         byte[] body = CreateEnvelopeBytesWithKdfMemory(1024, keySizeBytes: 20);
 
@@ -82,7 +82,7 @@ public sealed class AesGcmSecretEncryptorTests
 
     private static byte[] CreateEnvelopeBytesWithKdfMemory(int memorySizeKiB, int keySizeBytes = 32)
     {
-        var envelope = new SecretEnvelope
+        SecretEnvelope envelope = new()
         {
             Kdf = new KdfEnvelope
             {

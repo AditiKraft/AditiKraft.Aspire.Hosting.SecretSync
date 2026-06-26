@@ -11,14 +11,14 @@ internal sealed class ProjectUserSecretsStore(
         SecretSyncState state,
         CancellationToken cancellationToken)
     {
-        var resources = new Dictionary<string, Dictionary<string, string?>>(StringComparer.OrdinalIgnoreCase);
-        var edits = new List<SecretSyncLocalEdit>();
+        Dictionary<string, Dictionary<string, string?>> resources = new(StringComparer.OrdinalIgnoreCase);
+        List<SecretSyncLocalEdit> edits = [];
         bool hasMissingBaselineValues = false;
 
         foreach (ProjectUserSecretsSource source in options.ProjectUserSecretsSources)
         {
             string userSecretsId = ProjectUserSecretsResolver.GetRequiredUserSecretsId(source.ProjectPath);
-            IReadOnlyDictionary<string, string?> values = await userSecretsStore.ReadAsync(userSecretsId, cancellationToken);
+            IReadOnlyDictionary<string, string?> values = await UserSecretsStore.ReadAsync(userSecretsId, cancellationToken);
             UserSecretsReadResult result = UserSecretsMaterializer.ReadResource(
                 source.ResourceName,
                 values,
@@ -45,12 +45,12 @@ internal sealed class ProjectUserSecretsStore(
     public async Task<IReadOnlyDictionary<string, Dictionary<string, string?>>> ReadAllResourcesAsync(
         CancellationToken cancellationToken)
     {
-        var resources = new Dictionary<string, Dictionary<string, string?>>(StringComparer.OrdinalIgnoreCase);
+        Dictionary<string, Dictionary<string, string?>> resources = new(StringComparer.OrdinalIgnoreCase);
 
         foreach (ProjectUserSecretsSource source in options.ProjectUserSecretsSources)
         {
             string userSecretsId = ProjectUserSecretsResolver.GetRequiredUserSecretsId(source.ProjectPath);
-            IReadOnlyDictionary<string, string?> values = await userSecretsStore.ReadAsync(userSecretsId, cancellationToken);
+            IReadOnlyDictionary<string, string?> values = await UserSecretsStore.ReadAsync(userSecretsId, cancellationToken);
             Dictionary<string, string?> resource = UserSecretsMaterializer.ReadResourceValues(values);
 
             if (!resources.TryGetValue(source.ResourceName, out Dictionary<string, string?>? resourceValues))
@@ -77,7 +77,7 @@ internal sealed class ProjectUserSecretsStore(
         {
             string userSecretsId = ProjectUserSecretsResolver.GetRequiredUserSecretsId(source.ProjectPath);
             Dictionary<string, string?> current = new(StringComparer.OrdinalIgnoreCase);
-            foreach ((string key, string? value) in await userSecretsStore.ReadAsync(userSecretsId, cancellationToken))
+            foreach ((string key, string? value) in await UserSecretsStore.ReadAsync(userSecretsId, cancellationToken))
             {
                 current[key] = value;
             }
@@ -95,7 +95,7 @@ internal sealed class ProjectUserSecretsStore(
                 current,
                 resourceValues,
                 state.GetResourceHashes(source.ResourceName));
-            await userSecretsStore.WriteAsync(userSecretsId, current, cancellationToken);
+            await UserSecretsStore.WriteAsync(userSecretsId, current, cancellationToken);
         }
     }
 }

@@ -7,14 +7,14 @@ internal static class VaultFlattener
 {
     public static Dictionary<string, string?> Flatten(JsonObject source)
     {
-        var values = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
+        Dictionary<string, string?> values = new(StringComparer.OrdinalIgnoreCase);
         FlattenNode(source, null, values);
         return values;
     }
 
     public static JsonObject Unflatten(IReadOnlyDictionary<string, string?> source)
     {
-        var root = new JsonObject();
+        JsonObject root = [];
 
         foreach ((string key, string? value) in source)
         {
@@ -35,7 +35,7 @@ internal static class VaultFlattener
                 string segment = segments[i];
                 if (cursor[segment] is not JsonObject child)
                 {
-                    child = new JsonObject();
+                    child = [];
                     cursor[segment] = child;
                 }
 

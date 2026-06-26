@@ -1,4 +1,4 @@
-var builder = WebApplication.CreateBuilder(args);
+WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 
 // Add service defaults & Aspire client integrations.
 builder.AddServiceDefaults();
@@ -9,7 +9,7 @@ builder.Services.AddProblemDetails();
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
 
-var app = builder.Build();
+WebApplication app = builder.Build();
 
 // Configure the HTTP request pipeline.
 app.UseExceptionHandler();
@@ -25,15 +25,14 @@ app.MapGet("/", () => "API service is running. Navigate to /weatherforecast to s
 
 app.MapGet("/weatherforecast", (IConfiguration config) =>
 {
-    var forecast = Enumerable.Range(1, 5).Select(index =>
+    WeatherForecast[] forecast = [.. Enumerable.Range(1, 5).Select(index =>
         new WeatherForecast
         (
             DateOnly.FromDateTime(DateTime.Now.AddDays(index)),
             Random.Shared.Next(-20, 55),
             summaries[Random.Shared.Next(summaries.Length)],
             config.GetValue<string>("Name")
-        ))
-        .ToArray();
+        ))];
     return forecast;
 })
 .WithName("GetWeatherForecast");
@@ -42,7 +41,7 @@ app.MapDefaultEndpoints();
 
 app.Run();
 
-record WeatherForecast(DateOnly Date, int TemperatureC, string? Summary, string? Name)
+internal record WeatherForecast(DateOnly Date, int TemperatureC, string? Summary, string? Name)
 {
     public int TemperatureF => 32 + (int)(TemperatureC / 0.5556);
 }

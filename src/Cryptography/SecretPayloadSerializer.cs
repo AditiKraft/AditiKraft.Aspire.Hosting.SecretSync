@@ -34,12 +34,12 @@ internal static class SecretPayloadSerializer
         // come back with a different key order. Hashing the raw serialization would
         // then change even when nothing changed, causing spurious pushes. Sorting keys
         // makes equal content always produce equal bytes.
-        var canonical = new JsonObject
+        JsonObject canonical = new()
         {
             ["version"] = vault.Version
         };
 
-        var resources = new JsonObject();
+        JsonObject resources = [];
         foreach (string resourceName in vault.Resources.Keys.OrderBy(key => key, StringComparer.Ordinal))
         {
             resources[resourceName] = CanonicalizeNode(vault.Resources[resourceName]);
@@ -50,33 +50,6 @@ internal static class SecretPayloadSerializer
         byte[] bytes = Encoding.UTF8.GetBytes(canonical.ToJsonString());
         byte[] hash = SHA256.HashData(bytes);
         return Base64UrlEncode(hash);
-    }
-
-    private static JsonNode? CanonicalizeNode(JsonNode? node)
-    {
-        switch (node)
-        {
-            case JsonObject obj:
-                var sorted = new JsonObject();
-                foreach (string key in obj.Select(pair => pair.Key).OrderBy(key => key, StringComparer.Ordinal))
-                {
-                    sorted[key] = CanonicalizeNode(obj[key]);
-                }
-
-                return sorted;
-            case JsonArray array:
-                var ordered = new JsonArray();
-                for (int i = 0; i < array.Count; i++)
-                {
-                    ordered.Add(CanonicalizeNode(array[i]));
-                }
-
-                return ordered;
-            case null:
-                return null;
-            default:
-                return node.DeepClone();
-        }
     }
 
     public static string HashText(string value)
@@ -90,4 +63,31 @@ internal static class SecretPayloadSerializer
             .TrimEnd('=')
             .Replace('+', '-')
             .Replace('/', '_');
+
+    private static JsonNode? CanonicalizeNode(JsonNode? node)
+    {
+        switch (node)
+        {
+            case JsonObject obj:
+                JsonObject sorted = [];
+                foreach (string key in obj.Select(pair => pair.Key).OrderBy(key => key, StringComparer.Ordinal))
+                {
+                    sorted[key] = CanonicalizeNode(obj[key]);
+                }
+
+                return sorted;
+            case JsonArray array:
+                JsonArray ordered = [];
+                for (int i = 0; i < array.Count; i++)
+                {
+                    ordered.Add(CanonicalizeNode(array[i]));
+                }
+
+                return ordered;
+            case null:
+                return null;
+            default:
+                return node.DeepClone();
+        }
+    }
 }

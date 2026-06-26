@@ -8,7 +8,7 @@ public sealed class SecretPayloadSerializerTests
     [Fact]
     public void ComputeVaultHash_IsStableAcrossKeyOrder()
     {
-        var first = new SecretSyncVault
+        SecretSyncVault first = new()
         {
             Resources =
             {
@@ -19,7 +19,7 @@ public sealed class SecretPayloadSerializerTests
             }
         };
 
-        var second = new SecretSyncVault
+        SecretSyncVault second = new()
         {
             Resources =
             {
@@ -39,7 +39,7 @@ public sealed class SecretPayloadSerializerTests
     [Fact]
     public void ComputeVaultHash_ChangesWhenAValueChanges()
     {
-        var first = new SecretSyncVault
+        SecretSyncVault first = new()
         {
             Resources =
             {
@@ -47,7 +47,7 @@ public sealed class SecretPayloadSerializerTests
             }
         };
 
-        var second = new SecretSyncVault
+        SecretSyncVault second = new()
         {
             Resources =
             {
@@ -63,7 +63,7 @@ public sealed class SecretPayloadSerializerTests
     [Fact]
     public void ComputeVaultHash_PreservesArrayOrder()
     {
-        var first = new SecretSyncVault
+        SecretSyncVault first = new()
         {
             Resources =
             {
@@ -71,7 +71,7 @@ public sealed class SecretPayloadSerializerTests
             }
         };
 
-        var second = new SecretSyncVault
+        SecretSyncVault second = new()
         {
             Resources =
             {

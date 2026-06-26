@@ -21,7 +21,7 @@ public sealed class SecretSyncOptionsTests
     [Fact]
     public void Defaults_EnableNormalStartupAndShutdownSync()
     {
-        var options = new SecretSyncOptions();
+        SecretSyncOptions options = new();
 
         Assert.True(options.AutoPull);
         Assert.True(options.AutoPush);
@@ -45,7 +45,7 @@ public sealed class SecretSyncOptionsTests
             })
             .Build();
 
-        var options = new SecretSyncOptions();
+        SecretSyncOptions options = new();
         configuration.Bind(options);
 
         Assert.Equal("from-config", options.EncryptionKey);
@@ -66,7 +66,7 @@ public sealed class SecretSyncOptionsTests
             })
             .Build();
 
-        var options = new SecretSyncOptions();
+        SecretSyncOptions options = new();
         configuration.Bind(options);
 
         Assert.Equal("dev-secrets", options.S3.BucketName);

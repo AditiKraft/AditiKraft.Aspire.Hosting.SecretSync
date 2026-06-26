@@ -19,18 +19,12 @@ public static class SecretSyncExtensions
 {
     public static SecretSyncHandle AddSecretSync(
         this IDistributedApplicationBuilder builder,
-        Action<SecretSyncOptions> configure)
-    {
-        return AddSecretSyncAsync(builder, configure).ConfigureAwait(false).GetAwaiter().GetResult();
-    }
+        Action<SecretSyncOptions> configure) => AddSecretSyncAsync(builder, configure).ConfigureAwait(false).GetAwaiter().GetResult();
 
     public static SecretSyncHandle AddSecretSync(
         this IDistributedApplicationBuilder builder,
         IConfiguration configuration,
-        Action<SecretSyncOptions>? configure = null)
-    {
-        return AddSecretSyncAsync(builder, configuration, configure).ConfigureAwait(false).GetAwaiter().GetResult();
-    }
+        Action<SecretSyncOptions>? configure = null) => AddSecretSyncAsync(builder, configuration, configure).ConfigureAwait(false).GetAwaiter().GetResult();
 
     public static Task<SecretSyncHandle> AddSecretSyncAsync(
         this IDistributedApplicationBuilder builder,
@@ -62,18 +56,18 @@ public static class SecretSyncExtensions
         ArgumentNullException.ThrowIfNull(builder);
         ArgumentNullException.ThrowIfNull(configure);
 
-        var options = new SecretSyncOptions();
+        SecretSyncOptions options = new();
         configure(options);
         ResolveAppHostDefaults(builder, options);
 
-        var handle = new SecretSyncHandle();
+        SecretSyncHandle handle = new();
         ISecretSyncProvider provider = new S3SecretSyncProvider();
-        var encryptor = new AesGcmSecretEncryptor(options);
-        var userSecretsStore = new UserSecretsStore(options);
-        var projectUserSecretsStore = new ProjectUserSecretsStore(options, userSecretsStore);
-        var stateStore = new SecretSyncStateStore(options);
-        var snapshotBuilder = new SecretSnapshotBuilder(options, userSecretsStore, projectUserSecretsStore, stateStore);
-        var coordinator = new SecretSyncCoordinator(
+        AesGcmSecretEncryptor encryptor = new(options);
+        UserSecretsStore userSecretsStore = new(options);
+        ProjectUserSecretsStore projectUserSecretsStore = new(options, userSecretsStore);
+        SecretSyncStateStore stateStore = new(options);
+        SecretSnapshotBuilder snapshotBuilder = new(options, userSecretsStore, projectUserSecretsStore, stateStore);
+        SecretSyncCoordinator coordinator = new(
             options,
             handle,
             provider,
@@ -105,7 +99,7 @@ public static class SecretSyncExtensions
 
         builder.OnBeforeStart(async (@event, ct) =>
         {
-            var registeredCoordinator = @event.Services.GetRequiredService<SecretSyncCoordinator>();
+            SecretSyncCoordinator registeredCoordinator = @event.Services.GetRequiredService<SecretSyncCoordinator>();
             await registeredCoordinator.EnsurePulledBeforeStartAsync(ct);
         });
 
@@ -151,12 +145,12 @@ public static class SecretSyncExtensions
         // different manifest keys for the same identity across platforms, so teammates
         // on different operating systems could point at different remote objects.
         string trimmed = value.Trim().ToLowerInvariant();
-        var builder = new StringBuilder(trimmed.Length);
+        StringBuilder builder = new(trimmed.Length);
 
         foreach (char c in trimmed)
         {
-            bool isAllowed = c is >= 'a' and <= 'z'
-                or >= '0' and <= '9'
+            bool isAllowed = c is (>= 'a' and <= 'z')
+                or (>= '0' and <= '9')
                 or '-' or '_' or '.';
             builder.Append(isAllowed ? c : '-');
         }

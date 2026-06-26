@@ -17,13 +17,13 @@ public sealed class ProjectUserSecretsStoreTests : IDisposable
         string projectPath = await CreateProjectAsync(userSecretsId);
         TrackUserSecretsDirectory(userSecretsId);
 
-        var options = new SecretSyncOptions();
+        SecretSyncOptions options = new();
         options.MapProjectUserSecrets("api", projectPath);
 
-        var userSecretsStore = new UserSecretsStore(options);
-        var projectStore = new ProjectUserSecretsStore(options, userSecretsStore);
+        UserSecretsStore userSecretsStore = new(options);
+        ProjectUserSecretsStore projectStore = new(options, userSecretsStore);
 
-        var vault = new SecretSyncVault
+        SecretSyncVault vault = new()
         {
             Resources =
             {
@@ -40,7 +40,7 @@ public sealed class ProjectUserSecretsStoreTests : IDisposable
             }
         };
 
-        var emptyState = new SecretSyncState();
+        SecretSyncState emptyState = new();
         await projectStore.MergeVaultAsync(vault, emptyState, CancellationToken.None);
 
         IReadOnlyDictionary<string, string?> values =
@@ -84,19 +84,19 @@ public sealed class ProjectUserSecretsStoreTests : IDisposable
         string stateDirectory = Directory.CreateTempSubdirectory("secretsync-state-").FullName;
         TrackDirectory(stateDirectory);
 
-        var options = new SecretSyncOptions
+        SecretSyncOptions options = new()
         {
             ReadFromUserSecrets = false,
             StateDirectory = stateDirectory
         };
         options.MapProjectUserSecrets("api", projectPath);
 
-        var userSecretsStore = new UserSecretsStore(options);
-        var projectStore = new ProjectUserSecretsStore(options, userSecretsStore);
-        var stateStore = new SecretSyncStateStore(options);
-        var snapshotBuilder = new SecretSnapshotBuilder(options, userSecretsStore, projectStore, stateStore);
+        UserSecretsStore userSecretsStore = new(options);
+        ProjectUserSecretsStore projectStore = new(options, userSecretsStore);
+        SecretSyncStateStore stateStore = new(options);
+        SecretSnapshotBuilder snapshotBuilder = new(options, userSecretsStore, projectStore, stateStore);
 
-        var vault = new SecretSyncVault
+        SecretSyncVault vault = new()
         {
             Resources =
             {
@@ -130,7 +130,7 @@ public sealed class ProjectUserSecretsStoreTests : IDisposable
         }
     }
 
-    private async Task<string> CreateProjectAsync(string userSecretsId)
+    private static async Task<string> CreateProjectAsync(string userSecretsId)
     {
         string directory = Directory.CreateTempSubdirectory("secretsync-project-").FullName;
         string projectPath = Path.Combine(directory, "Api.csproj");
@@ -168,11 +168,11 @@ public sealed class ProjectUserSecretsStoreTests : IDisposable
 
     private static SecretSyncState CreateState(SecretSyncVault vault)
     {
-        var state = new SecretSyncState();
+        SecretSyncState state = new();
 
         foreach ((string resourceName, JsonObject resource) in vault.Resources)
         {
-            var hashes = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            Dictionary<string, string> hashes = new(StringComparer.OrdinalIgnoreCase);
             foreach ((string key, string? value) in VaultFlattener.Flatten(resource))
             {
                 hashes[key] = SecretValueHasher.Hash(value);

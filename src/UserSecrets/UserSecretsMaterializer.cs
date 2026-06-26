@@ -12,9 +12,9 @@ internal static class UserSecretsMaterializer
         IReadOnlyDictionary<string, string?> values,
         IReadOnlyDictionary<string, string> baselineHashes)
     {
-        var resource = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
-        var edits = new List<SecretSyncLocalEdit>();
-        var currentKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        Dictionary<string, string?> resource = new(StringComparer.OrdinalIgnoreCase);
+        List<SecretSyncLocalEdit> edits = [];
+        HashSet<string> currentKeys = new(StringComparer.OrdinalIgnoreCase);
 
         foreach ((string key, string? value) in values)
         {
@@ -42,7 +42,7 @@ internal static class UserSecretsMaterializer
     public static Dictionary<string, string?> ReadResourceValues(
         IReadOnlyDictionary<string, string?> values)
     {
-        var resource = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
+        Dictionary<string, string?> resource = new(StringComparer.OrdinalIgnoreCase);
 
         foreach ((string key, string? value) in values)
         {
@@ -60,7 +60,7 @@ internal static class UserSecretsMaterializer
         IReadOnlyDictionary<string, string?> resourceValues,
         IReadOnlyDictionary<string, string> baselineHashes)
     {
-        var resourceKeys = new HashSet<string>(resourceValues.Keys, StringComparer.OrdinalIgnoreCase);
+        HashSet<string> resourceKeys = new(resourceValues.Keys, StringComparer.OrdinalIgnoreCase);
 
         foreach ((string key, string? value) in resourceValues)
         {

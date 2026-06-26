@@ -2,13 +2,13 @@ namespace AditiKraft.Aspire.Hosting.SecretSync.Abstractions;
 
 public interface ISecretSyncProvider
 {
-    string Name { get; }
+    public string Name { get; }
 
-    Task<SecretSyncRemoteObject?> GetAsync(
+    public Task<SecretSyncRemoteObject?> GetAsync(
         SecretSyncProviderContext context,
         CancellationToken cancellationToken);
 
-    Task<SecretSyncRemoteWriteResult> PutAsync(
+    public Task<SecretSyncRemoteWriteResult> PutAsync(
         SecretSyncProviderContext context,
         byte[] body,
         SecretSyncWriteCondition condition,

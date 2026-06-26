@@ -1,8 +1,8 @@
 using AditiKraft.Aspire.Hosting.SecretSync;
 using Microsoft.Extensions.Configuration;
 
-var builder = DistributedApplication.CreateBuilder(args);
-var secretSync = builder.Configuration.GetSection("SecretSync");
+IDistributedApplicationBuilder builder = DistributedApplication.CreateBuilder(args);
+IConfigurationSection secretSync = builder.Configuration.GetSection("SecretSync");
 
 if (secretSync.GetValue("Enabled", false))
 {
@@ -14,10 +14,10 @@ if (secretSync.GetValue("Enabled", false))
     });
 }
 
-var apiService = builder.AddProject<Projects.AditiKraft_Aspire_Hosting_SecretSync_ApiService>("apiservice")
+IResourceBuilder<ProjectResource> apiService = builder.AddProject<Projects.AditiKraft_Aspire_Hosting_SecretSync_ApiService>("apiservice")
     .WithHttpHealthCheck("/health");
 
-var web = builder.AddProject<Projects.AditiKraft_Aspire_Hosting_SecretSync_Web>("webfrontend")
+IResourceBuilder<ProjectResource> web = builder.AddProject<Projects.AditiKraft_Aspire_Hosting_SecretSync_Web>("webfrontend")
     .WithExternalHttpEndpoints()
     .WithHttpHealthCheck("/health")
     .WithReference(apiService)

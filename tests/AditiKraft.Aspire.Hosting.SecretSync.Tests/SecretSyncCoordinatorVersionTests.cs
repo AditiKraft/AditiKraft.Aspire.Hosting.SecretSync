@@ -1,4 +1,3 @@
-using System.Text.Json.Nodes;
 using AditiKraft.Aspire.Hosting.SecretSync.Abstractions;
 using AditiKraft.Aspire.Hosting.SecretSync.Configuration;
 using AditiKraft.Aspire.Hosting.SecretSync.Cryptography;
@@ -22,7 +21,7 @@ public sealed class SecretSyncCoordinatorVersionTests : IDisposable
         TrackUserSecretsDirectory(options.UserSecretsId);
         TrackDirectory(options.StateDirectory);
 
-        var userSecretsStore = new UserSecretsStore(options);
+        UserSecretsStore userSecretsStore = new(options);
         await userSecretsStore.WriteAsync(
             options.UserSecretsId,
             new Dictionary<string, string?>
@@ -31,10 +30,10 @@ public sealed class SecretSyncCoordinatorVersionTests : IDisposable
             },
             CancellationToken.None);
 
-        var provider = new InMemorySecretSyncProvider();
-        var encryptor = new AesGcmSecretEncryptor(options);
-        var coordinator = CreateCoordinator(options, provider, encryptor);
-        var configuration = new ConfigurationManager();
+        InMemorySecretSyncProvider provider = new();
+        AesGcmSecretEncryptor encryptor = new(options);
+        SecretSyncCoordinator coordinator = CreateCoordinator(options, provider, encryptor);
+        ConfigurationManager configuration = new();
 
         await coordinator.PullAsync(configuration, CancellationToken.None);
 
@@ -72,7 +71,7 @@ public sealed class SecretSyncCoordinatorVersionTests : IDisposable
         TrackUserSecretsDirectory(options.UserSecretsId);
         TrackDirectory(options.StateDirectory);
 
-        var userSecretsStore = new UserSecretsStore(options);
+        UserSecretsStore userSecretsStore = new(options);
         await userSecretsStore.WriteAsync(
             options.UserSecretsId,
             new Dictionary<string, string?>
@@ -81,7 +80,7 @@ public sealed class SecretSyncCoordinatorVersionTests : IDisposable
             },
             CancellationToken.None);
 
-        var coordinator = CreateCoordinator(
+        SecretSyncCoordinator coordinator = CreateCoordinator(
             options,
             new InMemorySecretSyncProvider(),
             new AesGcmSecretEncryptor(options));
@@ -103,16 +102,16 @@ public sealed class SecretSyncCoordinatorVersionTests : IDisposable
         }
     }
 
-    private SecretSyncCoordinator CreateCoordinator(
+    private static SecretSyncCoordinator CreateCoordinator(
         SecretSyncOptions options,
         ISecretSyncProvider provider,
         AesGcmSecretEncryptor encryptor)
     {
-        var handle = new SecretSyncHandle();
-        var userSecretsStore = new UserSecretsStore(options);
-        var projectStore = new ProjectUserSecretsStore(options, userSecretsStore);
-        var stateStore = new SecretSyncStateStore(options);
-        var snapshotBuilder = new SecretSnapshotBuilder(options, userSecretsStore, projectStore, stateStore);
+        SecretSyncHandle handle = new();
+        UserSecretsStore userSecretsStore = new(options);
+        ProjectUserSecretsStore projectStore = new(options, userSecretsStore);
+        SecretSyncStateStore stateStore = new(options);
+        SecretSnapshotBuilder snapshotBuilder = new(options, userSecretsStore, projectStore, stateStore);
 
         return new SecretSyncCoordinator(
             options,
@@ -125,9 +124,9 @@ public sealed class SecretSyncCoordinatorVersionTests : IDisposable
             stateStore);
     }
 
-    private SecretSyncOptions CreateOptions()
+    private static SecretSyncOptions CreateOptions()
     {
-        var options = new SecretSyncOptions
+        SecretSyncOptions options = new()
         {
             EncryptionKey = "unit-test-encryption-key",
             UserSecretsId = $"secretsync-test-{Guid.NewGuid():N}",
@@ -198,7 +197,7 @@ public sealed class SecretSyncCoordinatorVersionTests : IDisposable
             }
 
             string etag = $"etag-{++_etag}";
-            var written = new SecretSyncRemoteObject(
+            SecretSyncRemoteObject written = new(
                 body,
                 etag,
                 metadata.TryGetValue("secret-sync-revision", out string? revision) ? revision : null,

@@ -20,7 +20,7 @@ internal static class SecretSyncConfigurationInjector
             throw new InvalidOperationException("SecretSync requires AppHost configuration to implement IConfigurationManager.");
         }
 
-        var source = new MemoryConfigurationSource
+        MemoryConfigurationSource source = new()
         {
             InitialData = secrets.Select(pair => new KeyValuePair<string, string?>(pair.Key, pair.Value))
         };

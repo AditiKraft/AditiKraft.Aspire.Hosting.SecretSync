@@ -1,8 +1,8 @@
 using System.Net;
+using AditiKraft.Aspire.Hosting.SecretSync.Abstractions;
 using Amazon.Runtime;
 using Amazon.S3;
 using Amazon.S3.Model;
-using AditiKraft.Aspire.Hosting.SecretSync.Abstractions;
 
 namespace AditiKraft.Aspire.Hosting.SecretSync.Providers;
 
@@ -24,10 +24,10 @@ public sealed class S3SecretSyncProvider : ISecretSyncProvider
                 context.ObjectKey,
                 cancellationToken);
 
-            using var ms = new MemoryStream();
+            using MemoryStream ms = new();
             await response.ResponseStream.CopyToAsync(ms, cancellationToken);
 
-            var metadata = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            Dictionary<string, string> metadata = new(StringComparer.OrdinalIgnoreCase);
             foreach (string key in response.Metadata.Keys)
             {
                 metadata[key] = response.Metadata[key];
@@ -59,9 +59,9 @@ public sealed class S3SecretSyncProvider : ISecretSyncProvider
         Validate(context);
 
         using AmazonS3Client client = CreateClient(context.Options.S3);
-        using var stream = new MemoryStream(body);
+        using MemoryStream stream = new(body);
 
-        var request = new PutObjectRequest
+        PutObjectRequest request = new()
         {
             BucketName = context.BucketName,
             Key = context.ObjectKey,
@@ -107,8 +107,8 @@ public sealed class S3SecretSyncProvider : ISecretSyncProvider
 
     private static AmazonS3Client CreateClient(S3SecretSyncOptions s3)
     {
-        var credentials = new BasicAWSCredentials(s3.AccessKeyId, s3.SecretAccessKey);
-        var config = new AmazonS3Config
+        BasicAWSCredentials credentials = new(s3.AccessKeyId, s3.SecretAccessKey);
+        AmazonS3Config config = new()
         {
             ServiceURL = s3.Endpoint,
             ForcePathStyle = s3.ForcePathStyle,

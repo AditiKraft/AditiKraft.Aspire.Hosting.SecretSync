@@ -13,7 +13,7 @@ class Build : NukeBuild
     readonly Configuration Configuration = IsLocalBuild ? Configuration.Debug : Configuration.Release;
 
     [Solution] readonly Solution Solution;
-    private readonly string RepositoryUrl = "https://github.com/AditiKraft/AditiKraft.Aspire.Hosting.SecretSync";
+
     AbsolutePath SourceDirectory => RootDirectory / "src";
     AbsolutePath AspireDirectory => RootDirectory / "aspire";
     AbsolutePath ArtifactsDirectory => RootDirectory / "artifacts";
@@ -22,8 +22,6 @@ class Build : NukeBuild
     AbsolutePath PackageProjectPath =>
         SourceDirectory / "AditiKraft.Aspire.Hosting.SecretSync.csproj";
 
-
-    [Parameter("Force release behavior for tag builds")] readonly bool ReleaseBuild;
     [Parameter("NuGet API Key for publishing templates")] private readonly string NuGetPAT;
     [Parameter("Package version (default: 0.0.10)")] private readonly string PackageVersion = "0.0.16";
 
@@ -78,19 +76,13 @@ class Build : NukeBuild
 
     Target Push => _ => _
         .DependsOn(Pack)
-        .Executes(() =>
-        {
-            PackageOutputDirectory.GlobFiles("*.nupkg")
+        .Executes(() => PackageOutputDirectory.GlobFiles("*.nupkg")
                 .Where(x => !x.Name.EndsWith("symbols.nupkg"))
-                .ForEach(x =>
-                {
-                    DotNetTasks.DotNetNuGetPush(s => s
+                .ForEach(x => DotNetTasks.DotNetNuGetPush(s => s
                         .SetTargetPath(x)
                         .SetSource("https://api.nuget.org/v3/index.json")
                         .SetApiKey(NuGetPAT)
-                        .EnableSkipDuplicate());
-                });
-        });
+                        .EnableSkipDuplicate())));
 
     #endregion
 }
