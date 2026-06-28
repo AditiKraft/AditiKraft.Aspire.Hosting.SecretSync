@@ -75,6 +75,51 @@ public sealed class SecretSyncOptionsTests
         Assert.True(options.AutoPush);
     }
 
+    [Fact]
+    public void ResolveRemoteIdentity_S3FormStaysUnchangedForBackwardCompatibility()
+    {
+        SecretSyncOptions options = new();
+        options.S3.BucketName = "dev-secrets";
+        options.S3.ManifestKey = "aspire/apphosts/app/latest.json";
+
+        Assert.Equal("dev-secrets|aspire/apphosts/app/latest.json", options.ResolveRemoteIdentity());
+    }
+
+    [Fact]
+    public void ResolveRemoteIdentity_DistinguishesGitHubRemotesThatWouldShareBlankS3Fields()
+    {
+        SecretSyncOptions first = CreateGitHubOptions("acme", "dev-secrets", "main");
+        SecretSyncOptions second = CreateGitHubOptions("acme", "dev-secrets", "release");
+        SecretSyncOptions third = CreateGitHubOptions("other-org", "dev-secrets", "main");
+
+        // The original hash input was "S3.BucketName|S3.ManifestKey", which is "|" for
+        // every GitHub remote. The provider-aware identity must keep them distinct.
+        Assert.NotEqual("|", first.ResolveRemoteIdentity());
+        Assert.NotEqual(first.ResolveRemoteIdentity(), second.ResolveRemoteIdentity());
+        Assert.NotEqual(first.ResolveRemoteIdentity(), third.ResolveRemoteIdentity());
+    }
+
+    [Fact]
+    public void ResolveRemoteIdentity_GitHubTreatsBlankBranchAsMain()
+    {
+        SecretSyncOptions blankBranch = CreateGitHubOptions("acme", "dev-secrets", "");
+        SecretSyncOptions mainBranch = CreateGitHubOptions("acme", "dev-secrets", "main");
+
+        Assert.Equal(mainBranch.ResolveRemoteIdentity(), blankBranch.ResolveRemoteIdentity());
+    }
+
+    private static SecretSyncOptions CreateGitHubOptions(string owner, string repository, string branch)
+    {
+        SecretSyncOptions options = new()
+        {
+            Provider = SecretSyncProviderType.GitHub
+        };
+        options.GitHub.Owner = owner;
+        options.GitHub.Repository = repository;
+        options.GitHub.Branch = branch;
+        return options;
+    }
+
     private static string FindRepositoryRoot()
     {
         string directory = AppContext.BaseDirectory;

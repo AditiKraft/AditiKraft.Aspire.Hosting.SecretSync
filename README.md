@@ -188,6 +188,49 @@ For Cloudflare R2, use your account R2 endpoint and set `Region` to `auto`.
 
 SecretSync depends on conditional writes (`If-Match` and `If-None-Match`) so one developer does not overwrite another developer's version.
 
+## GitHub Storage
+
+Instead of S3, SecretSync can keep the encrypted vault in a Git repository through
+the GitHub Contents API. Set `Provider` to `GitHub` and supply a `GitHub` block:
+
+```json
+{
+  "SecretSync": {
+    "Enabled": true,
+    "Provider": "GitHub",
+    "EncryptionKey": "use-a-password-manager-value",
+    "GitHub": {
+      "Owner": "your-org-or-username",
+      "Repository": "dev-secrets",
+      "Branch": "main",
+      "Token": "github_pat_xxxxxxxxxxxxxxxxxxxx"
+    }
+  }
+}
+```
+
+- `Owner` / `Repository` — the **private** repo that holds the encrypted files.
+- `Branch` — defaults to `main`.
+- `Token` — a **fine-grained PAT** scoped to that repo with `Contents: read/write`.
+- `ManifestKey` — optional. Leave empty to derive
+  `aspire/apphosts/{user-secrets-id}/latest.json`, exactly like `S3:ManifestKey`.
+  Only set it to store the files under a custom path in the repo.
+- `ApiBaseUrl` — **GitHub Enterprise Server only**, e.g.
+  `https://github.yourcompany.com/api/v3`. Omit it for github.com.
+
+`Provider` defaults to `S3`, so existing S3 configurations keep working unchanged
+without adding the key.
+
+The same immutable layout is used as S3 — `latest.json` plus a sibling
+`versions/{revision}.vault.json` folder. The blob `sha` the Contents API returns
+provides the same compare-and-swap guarantee as S3's `If-Match`, so two developers
+cannot clobber each other's version.
+
+> [!NOTE]
+> Every encrypted version is committed and stays in the repository's Git history
+> permanently (it cannot be garbage-collected like an S3 object). The data is still
+> only ever ciphertext, but for that reason the repository should be **private**.
+
 ## Common Options
 
 These defaults are already set:
@@ -240,10 +283,11 @@ Available modes:
 ## Security Notes
 
 - Do not commit `SecretSync:EncryptionKey`.
-- Do not commit S3 access keys.
+- Do not commit S3 access keys or GitHub tokens.
 - Use a long random encryption key from a password manager.
 - Use least-privilege S3 credentials scoped to the bucket or object prefix.
-- The S3-compatible provider receives encrypted vault bytes, not plaintext secret values.
+- For GitHub, use a fine-grained PAT scoped to one private repo with `Contents: read/write`.
+- The storage provider receives encrypted vault bytes, not plaintext secret values.
 - Local baseline state stores hashes, not plaintext secrets.
 
 ## Configuring Options

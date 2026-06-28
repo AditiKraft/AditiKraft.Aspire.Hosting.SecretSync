@@ -12,7 +12,11 @@ public sealed class SecretSyncOptions
     public SecretSyncVersionMode VersionMode { get; set; } = SecretSyncVersionMode.Latest;
     public string PinnedRevision { get; set; } = "";
 
+    public SecretSyncProviderType Provider { get; set; } = SecretSyncProviderType.S3;
+
     public S3SecretSyncOptions S3 { get; } = new();
+
+    public GitHubSecretSyncOptions GitHub { get; } = new();
 
     public bool WriteToUserSecrets { get; set; } = true;
     public bool ReadFromUserSecrets { get; set; } = true;
@@ -60,6 +64,48 @@ public sealed class SecretSyncOptions
         ProjectUserSecretsSources.Add(new ProjectUserSecretsSource(resourceName, projectPath));
         return this;
     }
+
+    // Provider-neutral accessors so the coordinator does not hard-code S3. Each
+    // backend stores its manifest path on its own options block, but the layout
+    // (latest.json plus a sibling versions/ folder) is identical across providers.
+    internal string ResolveManifestKey() => Provider switch
+    {
+        SecretSyncProviderType.GitHub => GitHub.ManifestKey,
+        _ => S3.ManifestKey
+    };
+
+    internal void ApplyDefaultManifestKey(string value)
+    {
+        switch (Provider)
+        {
+            case SecretSyncProviderType.GitHub:
+                GitHub.ManifestKey = value;
+                break;
+            default:
+                S3.ManifestKey = value;
+                break;
+        }
+    }
+
+    // The container the object lives in. For S3 this is the bucket; for GitHub the
+    // provider reads Owner/Repository directly, so this value is informational only.
+    internal string ResolveContainer() => Provider switch
+    {
+        SecretSyncProviderType.GitHub => GitHub.Repository,
+        _ => S3.BucketName
+    };
+
+    // Distinguishes the local state file per remote target so two different remotes
+    // never share one state.json. The S3 form is kept byte-for-byte identical to the
+    // original so existing S3 state files remain valid after upgrading. GitHub adds
+    // owner/repository/branch/manifest because its S3 fields are blank and would
+    // otherwise all collide on the same hash.
+    internal string ResolveRemoteIdentity() => Provider switch
+    {
+        SecretSyncProviderType.GitHub =>
+            $"GitHub|{GitHub.Owner}|{GitHub.Repository}|{(string.IsNullOrWhiteSpace(GitHub.Branch) ? "main" : GitHub.Branch)}|{GitHub.ManifestKey}",
+        _ => $"{S3.BucketName}|{S3.ManifestKey}"
+    };
 }
 
 public sealed record ProjectUserSecretsSource(string ResourceName, string ProjectPath);
@@ -92,6 +138,12 @@ public enum SecretSyncVersionMode
     Pinned
 }
 
+public enum SecretSyncProviderType
+{
+    S3,
+    GitHub
+}
+
 public sealed class S3SecretSyncOptions
 {
     public string BucketName { get; set; } = "";
@@ -103,6 +155,22 @@ public sealed class S3SecretSyncOptions
     public bool ForcePathStyle { get; set; } = true;
     public bool DisablePayloadSigning { get; set; } = true;
     public bool DisableDefaultChecksumValidation { get; set; } = true;
+}
+
+public sealed class GitHubSecretSyncOptions
+{
+    public string Owner { get; set; } = "";
+    public string Repository { get; set; } = "";
+    public string Branch { get; set; } = "main";
+    public string Token { get; set; } = "";
+
+    // Path to latest.json inside the repo. Leave empty to derive
+    // aspire/apphosts/{user-secrets-id}/latest.json, mirroring S3.ManifestKey.
+    public string ManifestKey { get; set; } = "";
+
+    // Override only for GitHub Enterprise Server, e.g.
+    // https://github.yourcompany.com/api/v3. Empty uses https://api.github.com.
+    public string ApiBaseUrl { get; set; } = "";
 }
 
 public sealed class Argon2idOptions
