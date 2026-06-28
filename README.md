@@ -190,7 +190,7 @@ Normal development:
 
 ## Remote Storage
 
-If `S3:ManifestKey` is empty, SecretSync derives a manifest key from the AppHost user-secrets id:
+If the manifest key is empty (`S3:ManifestKey` or `GitHub:ManifestKey`), SecretSync derives one from the AppHost user-secrets id:
 
 ```text
 aspire/apphosts/{user-secrets-id}/latest.json
@@ -279,7 +279,7 @@ options.VersionMode = SecretSyncVersionMode.Latest;
 
 You usually do not need to set them in AppHost code.
 
-Use `IfStale` when you want to avoid checking S3 on every AppHost run:
+Use `IfStale` when you want to avoid checking remote storage on every AppHost run:
 
 ```csharp
 options.PullMode = SecretSyncPullMode.IfStale;
@@ -331,9 +331,9 @@ whichever you prefer.
 
 ### Bind from configuration (recommended)
 
-Pass the `SecretSync` config section. `EncryptionKey` and everything under `S3`
-are bound for you. Only the project mappings stay in code, because they
-reference generated `Projects.*` types:
+Pass the `SecretSync` config section. `EncryptionKey`, `Provider`, and everything
+under `S3` and `GitHub` are bound for you. Only the project mappings stay in code,
+because they reference generated `Projects.*` types:
 
 ```csharp
 var secretSync = builder.Configuration.GetSection("SecretSync");
@@ -371,6 +371,10 @@ await builder.AddSecretSyncAsync(options =>
 });
 ```
 
+For GitHub, set `options.Provider = SecretSyncProviderType.GitHub;` and the
+`options.GitHub.*` values (`Owner`, `Repository`, `Branch`, `Token`) instead of
+the `options.S3.*` block.
+
 ### Mix both
 
 With the config-binding overload, `configure` runs *after* the bind, so you can
@@ -386,7 +390,7 @@ await builder.AddSecretSyncAsync(secretSync, options =>
 
 ## API
 
-- `AddSecretSyncAsync(configurationSection, configure)` — binds `EncryptionKey` and `S3` from the config section, then applies the code-only mappings in `configure`.
+- `AddSecretSyncAsync(configurationSection, configure)` — binds `EncryptionKey`, `Provider`, `S3`, and `GitHub` from the config section, then applies the code-only mappings in `configure`.
 - `AddSecretSyncAsync(configure)` — configure every option in code.
 - `AddSecretSync(...)` — synchronous overloads of the above.
 - `MapAppHostSecrets(resourceName)`
