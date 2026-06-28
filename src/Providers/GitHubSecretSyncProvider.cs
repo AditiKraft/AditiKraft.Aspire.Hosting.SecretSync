@@ -30,8 +30,10 @@ public sealed class GitHubSecretSyncProvider : ISecretSyncProvider
     {
     }
 
-    internal GitHubSecretSyncProvider(HttpClient httpClient) =>
+    internal GitHubSecretSyncProvider(HttpClient httpClient)
+    {
         _httpClient = httpClient;
+    }
 
     public string Name => "GitHub";
 
@@ -126,7 +128,7 @@ public sealed class GitHubSecretSyncProvider : ISecretSyncProvider
             DateTimeOffset.UtcNow);
     }
 
-    private HttpRequestMessage CreateRequest(
+    private static HttpRequestMessage CreateRequest(
         HttpMethod method,
         GitHubSecretSyncOptions gh,
         string objectKey,

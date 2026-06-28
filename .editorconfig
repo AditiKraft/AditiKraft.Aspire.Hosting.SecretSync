@@ -569,7 +569,13 @@ dotnet_style_parentheses_in_other_binary_operators = always_for_clarity:suggesti
 dotnet_style_parentheses_in_other_operators = never_if_unnecessary:suggestion
 
 # Other preferences
-dotnet_style_prefer_auto_properties = true:suggestion
+# Auto-properties OFF globally (reflection safety): "use auto-property" (IDE0032)
+# merges an explicit backing field into the property, silently breaking EF Core
+# backing-field mappings, Blazor markup bindings, and serializer/reflection
+# access. An analyzer can't tell those backing fields from cosmetic ones, so we
+# disable it for every file. See the IDE0051/IDE0052 reflection-safety note below.
+dotnet_style_prefer_auto_properties = false
+dotnet_diagnostic.IDE0032.severity = none
 dotnet_style_prefer_inferred_tuple_names = true:suggestion
 dotnet_style_prefer_inferred_anonymous_type_member_names = true:suggestion
 dotnet_style_prefer_conditional_expression_over_assignment = true:silent
@@ -717,11 +723,16 @@ dotnet_diagnostic.IDE0004.severity = warning
 # IDE0005: Remove unnecessary using directives
 dotnet_diagnostic.IDE0005.severity = warning
 
-# IDE0051: Remove unused private member
-dotnet_diagnostic.IDE0051.severity = warning
-
-# IDE0052: Remove unread private member
-dotnet_diagnostic.IDE0052.severity = warning
+# IDE0051 / IDE0052: Remove unused / unread private members.
+# OFF globally as a reflection-safety default (not just for entity folders): a
+# private parameterless constructor or backing field used at RUNTIME by EF Core,
+# Blazor markup, serializers, or DI looks "unused" to the analyzer, and the
+# auto-fix DELETES it -- a green build that breaks at runtime. We can't tell those
+# uses from a file path, so we protect EVERY .cs file no matter where it lives.
+# Trade-off: genuinely dead private members are no longer flagged (catch those in
+# code review instead).
+dotnet_diagnostic.IDE0051.severity = none
+dotnet_diagnostic.IDE0052.severity = none
 
 # IDE0055: Formatting rule
 dotnet_diagnostic.IDE0055.severity = warning
@@ -746,6 +757,28 @@ dotnet_diagnostic.CA1848.severity = suggestion
 
 # CA1860: Prefer Length/Count > 0 over Any()
 dotnet_diagnostic.CA1860.severity = suggestion
+
+# ==============================================================================
+# EF CORE QUERY TRANSLATION
+# ==============================================================================
+# These analyzers "modernize" string calls into overloads that EF Core CANNOT
+# translate to SQL. The auto-fix turns a working IQueryable filter into a runtime
+# "The LINQ expression could not be translated" error. An analyzer can't tell
+# IQueryable (EF, runs as SQL) from IEnumerable (in-memory) at the call site, so
+# these are disabled globally. In EF queries do case-insensitive search with
+# x.ToLower().Contains(y) (EF emits LOWER() + LIKE) or EF.Functions.Like(...).
+#
+# CA1862: suggests x.Contains(s, StringComparison) over x.ToLower().Contains(s).
+#         EF translates ToLower()/Contains() but NOT the StringComparison overload.
+dotnet_diagnostic.CA1862.severity = none
+# CA1307: "specify StringComparison for clarity" — same untranslatable overload.
+dotnet_diagnostic.CA1307.severity = none
+# CA1311 / CA1304: push ToLower() -> ToLowerInvariant() / add a CultureInfo arg.
+#         EF translates ToLower()/ToUpper() ONLY — not the *Invariant() variants.
+dotnet_diagnostic.CA1311.severity = none
+dotnet_diagnostic.CA1304.severity = none
+# CA1305: "specify IFormatProvider" — adds ToString(culture) EF can't translate.
+dotnet_diagnostic.CA1305.severity = none
 
 # ==============================================================================
 # STYLECOP ANALYZERS
@@ -818,4 +851,50 @@ end_of_line = lf
 # Batch files
 [*.{cmd,bat}]
 end_of_line = crlf
+
+# ==============================================================================
+# EF CORE ENTITIES — extra scoped hardening (adjust globs to YOUR layout)
+# ==============================================================================
+# The DESTRUCTIVE auto-fixes (delete unused/unread private members, merge backing
+# fields into auto-properties) are already OFF globally via the reflection-safety
+# defaults above, so EF entities are protected no matter which folder they live in
+# -- you do NOT need to list every entity location for that protection.
+#
+# These two extra rules stay SCOPED because they have real value in normal code
+# and we only want them off where EF owns object construction:
+#   * IDE0044 (readonly field) — EF assigns fields during materialization.
+#   * primary constructors     — conflict with EF's required parameterless ctor /
+#                                property mapping, and `dotnet format --severity
+#                                info` auto-applies the primary-ctor suggestion.
+# Trim/extend the globs (folder names + *Entity.cs/*DbContext.cs filenames) to
+# match your layout. Anything missed here is still safe from the destructive
+# fixes; at worst a stray entity gets a readonly field or a primary ctor.
+[**/{Entities,Domain,Persistence,Data,Aggregates,Models}/**.cs]
+dotnet_diagnostic.IDE0044.severity = none
+csharp_style_prefer_primary_constructors = false:silent
+
+[*{Entity,DbContext}.cs]
+dotnet_diagnostic.IDE0044.severity = none
+csharp_style_prefer_primary_constructors = false:silent
+
+# ==============================================================================
+# BLAZOR CODE-BEHIND (must stay LAST so these keys win for *.razor.cs)
+# ==============================================================================
+# C# analyzers/fixers only see the .cs file, never the paired .razor markup that
+# shares the same partial class. So members referenced from markup look unused /
+# freely renamable / mergeable, and "fixing" them silently breaks the build.
+# The delete/merge transforms (IDE0051/IDE0052/IDE0032 + auto-properties) are
+# already OFF globally via the reflection-safety defaults above; the rules below
+# add the markup-specific ones that are NOT global.
+[*.razor.cs]
+# Naming rules (e.g. private field -> _underscore) would rename members that
+# markup binds by name (@CreateRequest, @paymentEntryTypeOptions, ...). A rename
+# can't be seen across the .razor boundary, so suppress auto-rename here.
+dotnet_diagnostic.IDE1006.severity = none
+# Don't mark a field readonly — markup may two-way bind it (@bind="_field"),
+# which writes to it; readonly would break that binding at compile time.
+dotnet_diagnostic.IDE0044.severity = none
+# Components are activated by the framework via a parameterless constructor;
+# a primary-constructor rewrite changes the ctor signature and breaks activation.
+csharp_style_prefer_primary_constructors = false:silent
 # <<< csharp-style (managed) <<<
