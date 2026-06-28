@@ -225,23 +225,9 @@ SecretSync depends on conditional writes (`If-Match` and `If-None-Match`) so one
 ## GitHub Storage
 
 Instead of S3, SecretSync can keep the encrypted vault in a Git repository through
-the GitHub Contents API. Set `Provider` to `GitHub` and supply a `GitHub` block:
-
-```json
-{
-  "SecretSync": {
-    "Enabled": true,
-    "Provider": "GitHub",
-    "EncryptionKey": "use-a-password-manager-value",
-    "GitHub": {
-      "Owner": "your-org-or-username",
-      "Repository": "dev-secrets",
-      "Branch": "main",
-      "Token": "github_pat_xxxxxxxxxxxxxxxxxxxx"
-    }
-  }
-}
-```
+the GitHub Contents API. Set `Provider` to `GitHub` and supply a `GitHub` block —
+see [Option B in the Quick Start](#quick-start) for the full bootstrap example. The
+fields are:
 
 - `Owner` / `Repository` — the **private** repo that holds the encrypted files.
 - `Branch` — defaults to `main`.
@@ -251,9 +237,6 @@ the GitHub Contents API. Set `Provider` to `GitHub` and supply a `GitHub` block:
   Only set it to store the files under a custom path in the repo.
 - `ApiBaseUrl` — **GitHub Enterprise Server only**, e.g.
   `https://github.yourcompany.com/api/v3`. Omit it for github.com.
-
-`Provider` defaults to `S3`, so existing S3 configurations keep working unchanged
-without adding the key.
 
 The same immutable layout is used as S3 — `latest.json` plus a sibling
 `versions/{revision}.vault.json` folder. The blob `sha` the Contents API returns
