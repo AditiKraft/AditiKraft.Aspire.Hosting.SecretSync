@@ -331,7 +331,9 @@ await builder.AddSecretSyncAsync(secretSync, options =>
 
 ### Configure everything in code
 
-If you would rather wire each value yourself, use the `configure`-only overload:
+If you would rather wire each value yourself, use the `configure`-only overload.
+
+**S3:**
 
 ```csharp
 var secretSync = builder.Configuration.GetSection("SecretSync");
@@ -354,9 +356,31 @@ await builder.AddSecretSyncAsync(options =>
 });
 ```
 
-For GitHub, set `options.Provider = SecretSyncProviderType.GitHub;` and the
-`options.GitHub.*` values (`Owner`, `Repository`, `Branch`, `Token`) instead of
-the `options.S3.*` block.
+**GitHub:**
+
+```csharp
+var secretSync = builder.Configuration.GetSection("SecretSync");
+var github = secretSync.GetSection("GitHub");
+
+await builder.AddSecretSyncAsync(options =>
+{
+    options.Provider = SecretSyncProviderType.GitHub;
+    options.EncryptionKey = secretSync["EncryptionKey"] ?? "";
+
+    options.GitHub.Owner = github["Owner"] ?? "";
+    options.GitHub.Repository = github["Repository"] ?? "";
+    options.GitHub.Branch = github["Branch"] ?? "main";
+    options.GitHub.Token = github["Token"] ?? "";
+    // Optional: custom in-repo path; leave blank to derive the default.
+    options.GitHub.ManifestKey = github["ManifestKey"] ?? "";
+    // Optional: GitHub Enterprise Server only.
+    options.GitHub.ApiBaseUrl = github["ApiBaseUrl"] ?? "";
+
+    options.MapAppHostSecrets("apphost");
+    options.MapProjectUserSecrets<Projects.ApiService>("api");
+    options.MapProjectUserSecrets<Projects.Web>("web");
+});
+```
 
 ### Mix both
 
