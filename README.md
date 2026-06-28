@@ -1,6 +1,6 @@
 # AditiKraft.Aspire.Hosting.SecretSync
 
-Encrypted development secret sync for .NET Aspire AppHost and mapped project user-secrets using S3-compatible storage.
+Encrypted development secret sync for .NET Aspire AppHost and mapped project user-secrets, backed by **S3-compatible** or **GitHub** storage.
 
 [![NuGet](https://img.shields.io/nuget/v/AditiKraft.Aspire.Hosting.SecretSync.svg)](https://www.nuget.org/packages/AditiKraft.Aspire.Hosting.SecretSync)
 
@@ -14,12 +14,24 @@ Install the package in your AppHost project:
 dotnet add package AditiKraft.Aspire.Hosting.SecretSync
 ```
 
-Add bootstrap config to the AppHost user-secrets file:
+Add bootstrap config to the AppHost user-secrets file. SecretSync supports two
+storage backends — pick the one that fits your team:
+
+| | S3-compatible | GitHub |
+|---|---|---|
+| Best when | You already use AWS S3 / R2 / MinIO / etc. | You want a free private repo with no separate storage account |
+| Selected by | `"Provider": "S3"` (the default) | `"Provider": "GitHub"` |
+| Credentials | Access key + secret | Fine-grained PAT (`Contents: read/write`) |
+| Latency | Lowest, esp. on push | Slightly higher on push (each write is a commit) |
+| Setup | Create a bucket | Create a **private** repo |
+
+**Option A — S3-compatible storage**
 
 ```json
 {
   "SecretSync": {
     "Enabled": true,
+    "Provider": "S3",
     "EncryptionKey": "use-a-password-manager-value",
     "S3": {
       "BucketName": "dev-secrets",
@@ -32,6 +44,28 @@ Add bootstrap config to the AppHost user-secrets file:
   }
 }
 ```
+
+**Option B — GitHub storage**
+
+```json
+{
+  "SecretSync": {
+    "Enabled": true,
+    "Provider": "GitHub",
+    "EncryptionKey": "use-a-password-manager-value",
+    "GitHub": {
+      "Owner": "your-org-or-username",
+      "Repository": "dev-secrets",
+      "Branch": "main",
+      "Token": "github_pat_xxxxxxxxxxxxxxxxxxxx"
+    }
+  }
+}
+```
+
+`Provider` defaults to `S3`, so existing S3 configurations keep working without
+adding the key. See [S3-Compatible Storage](#s3-compatible-storage) and
+[GitHub Storage](#github-storage) below for the full details of each.
 
 Wire SecretSync into `AppHost.cs` or `Program.cs`:
 
@@ -50,7 +84,7 @@ if (secretSync.GetValue("Enabled", false))
         options.MapProjectUserSecrets<Projects.ApiService>("api");
         options.MapProjectUserSecrets<Projects.Web>("web");
 
-        // Optional: reduce S3 checks during repeated local runs.
+        // Optional: reduce remote checks during repeated local runs.
         // options.PullMode = SecretSyncPullMode.IfStale;
         // options.StaleAfter = TimeSpan.FromMinutes(15);
 
