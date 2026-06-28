@@ -22,7 +22,7 @@ public sealed class SecretSyncCoordinatorVersionTests : IDisposable
         TrackDirectory(options.StateDirectory);
 
         UserSecretsStore userSecretsStore = new(options);
-        await userSecretsStore.WriteAsync(
+        await UserSecretsStore.WriteAsync(
             options.UserSecretsId,
             new Dictionary<string, string?>
             {
@@ -39,7 +39,7 @@ public sealed class SecretSyncCoordinatorVersionTests : IDisposable
 
         SecretSyncManifest firstManifest = provider.ReadManifest(options.S3.ManifestKey);
 
-        await userSecretsStore.MergeAsync(
+        await UserSecretsStore.MergeAsync(
             options.UserSecretsId,
             new Dictionary<string, string?>
             {
@@ -72,7 +72,7 @@ public sealed class SecretSyncCoordinatorVersionTests : IDisposable
         TrackDirectory(options.StateDirectory);
 
         UserSecretsStore userSecretsStore = new(options);
-        await userSecretsStore.WriteAsync(
+        await UserSecretsStore.WriteAsync(
             options.UserSecretsId,
             new Dictionary<string, string?>
             {

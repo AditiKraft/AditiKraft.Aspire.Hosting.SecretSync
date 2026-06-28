@@ -41,7 +41,7 @@ public sealed class AesGcmSecretEncryptorTests
         AesGcmSecretEncryptor encryptor = new(options);
 
         SecretEnvelope envelope = encryptor.Encrypt(vault, parentRevision: null);
-        SecretPayload payload = encryptor.Decrypt(encryptor.SerializeEnvelope(envelope));
+        SecretPayload payload = encryptor.Decrypt(AesGcmSecretEncryptor.SerializeEnvelope(envelope));
 
         Assert.Equal("unit-tests", payload.ProjectId);
         Assert.Equal(

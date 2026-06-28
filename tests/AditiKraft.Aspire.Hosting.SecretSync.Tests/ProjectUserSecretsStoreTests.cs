@@ -44,7 +44,7 @@ public sealed class ProjectUserSecretsStoreTests : IDisposable
         await projectStore.MergeVaultAsync(vault, emptyState, CancellationToken.None);
 
         IReadOnlyDictionary<string, string?> values =
-            await userSecretsStore.ReadAsync(userSecretsId, CancellationToken.None);
+            await UserSecretsStore.ReadAsync(userSecretsId, CancellationToken.None);
 
         Assert.Equal("sk-api", values["Stripe:ApiKey"]);
         Assert.Equal("api", values["Stripe:Mode"]);
@@ -59,7 +59,7 @@ public sealed class ProjectUserSecretsStoreTests : IDisposable
         Assert.True(read.Resources.TryGetValue("api", out Dictionary<string, string?>? apiResource));
         Assert.Empty(apiResource);
 
-        await userSecretsStore.MergeAsync(
+        await UserSecretsStore.MergeAsync(
             userSecretsId,
             new Dictionary<string, string?> { ["Stripe:ApiKey"] = "sk-api-local-edit" },
             overwriteExisting: true,
@@ -104,7 +104,7 @@ public sealed class ProjectUserSecretsStoreTests : IDisposable
             }
         };
 
-        await userSecretsStore.WriteAsync(
+        await UserSecretsStore.WriteAsync(
             userSecretsId,
             new Dictionary<string, string?>
             {
