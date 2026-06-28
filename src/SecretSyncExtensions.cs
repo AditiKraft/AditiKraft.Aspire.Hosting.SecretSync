@@ -61,7 +61,7 @@ public static class SecretSyncExtensions
         ResolveAppHostDefaults(builder, options);
 
         SecretSyncHandle handle = new();
-        ISecretSyncProvider provider = new S3SecretSyncProvider();
+        ISecretSyncProvider provider = CreateProvider(options);
         AesGcmSecretEncryptor encryptor = new(options);
         UserSecretsStore userSecretsStore = new(options);
         ProjectUserSecretsStore projectUserSecretsStore = new(options, userSecretsStore);
@@ -106,6 +106,13 @@ public static class SecretSyncExtensions
         return handle;
     }
 
+    private static ISecretSyncProvider CreateProvider(SecretSyncOptions options) =>
+        options.Provider switch
+        {
+            SecretSyncProviderType.GitHub => new GitHubSecretSyncProvider(),
+            _ => new S3SecretSyncProvider()
+        };
+
     private static void ResolveAppHostDefaults(IDistributedApplicationBuilder builder, SecretSyncOptions options)
     {
         if (string.IsNullOrWhiteSpace(options.ProjectId))
@@ -123,9 +130,9 @@ public static class SecretSyncExtensions
             }
         }
 
-        if (string.IsNullOrWhiteSpace(options.S3.ManifestKey))
+        if (string.IsNullOrWhiteSpace(options.ResolveManifestKey()))
         {
-            options.S3.ManifestKey = CreateDefaultManifestKey(options);
+            options.ApplyDefaultManifestKey(CreateDefaultManifestKey(options));
         }
     }
 

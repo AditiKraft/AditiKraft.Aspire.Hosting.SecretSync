@@ -1,6 +1,6 @@
 # AditiKraft.Aspire.Hosting.SecretSync
 
-Encrypted development secret sync for .NET Aspire AppHost and mapped project user-secrets using S3-compatible storage.
+Encrypted development secret sync for .NET Aspire AppHost and mapped project user-secrets, backed by **S3-compatible** or **GitHub** storage.
 
 [![NuGet](https://img.shields.io/nuget/v/AditiKraft.Aspire.Hosting.SecretSync.svg)](https://www.nuget.org/packages/AditiKraft.Aspire.Hosting.SecretSync)
 
@@ -14,12 +14,24 @@ Install the package in your AppHost project:
 dotnet add package AditiKraft.Aspire.Hosting.SecretSync
 ```
 
-Add bootstrap config to the AppHost user-secrets file:
+Add bootstrap config to the AppHost user-secrets file. SecretSync supports two
+storage backends — pick the one that fits your team:
+
+| | S3-compatible | GitHub |
+|---|---|---|
+| Best when | You already use AWS S3 / R2 / MinIO / etc. | You want a free private repo with no separate storage account |
+| Selected by | `"Provider": "S3"` (the default) | `"Provider": "GitHub"` |
+| Credentials | Access key + secret | Fine-grained PAT (`Contents: read/write`) |
+| Latency | Lowest, esp. on push | Slightly higher on push (each write is a commit) |
+| Setup | Create a bucket | Create a **private** repo |
+
+**Option A — S3-compatible storage**
 
 ```json
 {
   "SecretSync": {
     "Enabled": true,
+    "Provider": "S3",
     "EncryptionKey": "use-a-password-manager-value",
     "S3": {
       "BucketName": "dev-secrets",
@@ -32,6 +44,28 @@ Add bootstrap config to the AppHost user-secrets file:
   }
 }
 ```
+
+**Option B — GitHub storage**
+
+```json
+{
+  "SecretSync": {
+    "Enabled": true,
+    "Provider": "GitHub",
+    "EncryptionKey": "use-a-password-manager-value",
+    "GitHub": {
+      "Owner": "your-org-or-username",
+      "Repository": "dev-secrets",
+      "Branch": "main",
+      "Token": "github_pat_xxxxxxxxxxxxxxxxxxxx"
+    }
+  }
+}
+```
+
+`Provider` defaults to `S3`, so existing S3 configurations keep working without
+adding the key. See [S3-Compatible Storage](#s3-compatible-storage) and
+[GitHub Storage](#github-storage) below for the full details of each.
 
 Wire SecretSync into `AppHost.cs` or `Program.cs`:
 
@@ -50,7 +84,7 @@ if (secretSync.GetValue("Enabled", false))
         options.MapProjectUserSecrets<Projects.ApiService>("api");
         options.MapProjectUserSecrets<Projects.Web>("web");
 
-        // Optional: reduce S3 checks during repeated local runs.
+        // Optional: reduce remote checks during repeated local runs.
         // options.PullMode = SecretSyncPullMode.IfStale;
         // options.StaleAfter = TimeSpan.FromMinutes(15);
 
@@ -156,7 +190,7 @@ Normal development:
 
 ## Remote Storage
 
-If `S3:ManifestKey` is empty, SecretSync derives a manifest key from the AppHost user-secrets id:
+If the manifest key is empty (`S3:ManifestKey` or `GitHub:ManifestKey`), SecretSync derives one from the AppHost user-secrets id:
 
 ```text
 aspire/apphosts/{user-secrets-id}/latest.json
@@ -188,6 +222,32 @@ For Cloudflare R2, use your account R2 endpoint and set `Region` to `auto`.
 
 SecretSync depends on conditional writes (`If-Match` and `If-None-Match`) so one developer does not overwrite another developer's version.
 
+## GitHub Storage
+
+Instead of S3, SecretSync can keep the encrypted vault in a Git repository through
+the GitHub Contents API. Set `Provider` to `GitHub` and supply a `GitHub` block —
+see [Option B in the Quick Start](#quick-start) for the full bootstrap example. The
+fields are:
+
+- `Owner` / `Repository` — the **private** repo that holds the encrypted files.
+- `Branch` — defaults to `main`.
+- `Token` — a **fine-grained PAT** scoped to that repo with `Contents: read/write`.
+- `ManifestKey` — optional. Leave empty to derive
+  `aspire/apphosts/{user-secrets-id}/latest.json`, exactly like `S3:ManifestKey`.
+  Only set it to store the files under a custom path in the repo.
+- `ApiBaseUrl` — **GitHub Enterprise Server only**, e.g.
+  `https://github.yourcompany.com/api/v3`. Omit it for github.com.
+
+The same immutable layout is used as S3 — `latest.json` plus a sibling
+`versions/{revision}.vault.json` folder. The blob `sha` the Contents API returns
+provides the same compare-and-swap guarantee as S3's `If-Match`, so two developers
+cannot clobber each other's version.
+
+> [!NOTE]
+> Every encrypted version is committed and stays in the repository's Git history
+> permanently (it cannot be garbage-collected like an S3 object). The data is still
+> only ever ciphertext, but for that reason the repository should be **private**.
+
 ## Common Options
 
 These defaults are already set:
@@ -202,7 +262,7 @@ options.VersionMode = SecretSyncVersionMode.Latest;
 
 You usually do not need to set them in AppHost code.
 
-Use `IfStale` when you want to avoid checking S3 on every AppHost run:
+Use `IfStale` when you want to avoid checking remote storage on every AppHost run:
 
 ```csharp
 options.PullMode = SecretSyncPullMode.IfStale;
@@ -240,10 +300,11 @@ Available modes:
 ## Security Notes
 
 - Do not commit `SecretSync:EncryptionKey`.
-- Do not commit S3 access keys.
+- Do not commit S3 access keys or GitHub tokens.
 - Use a long random encryption key from a password manager.
 - Use least-privilege S3 credentials scoped to the bucket or object prefix.
-- The S3-compatible provider receives encrypted vault bytes, not plaintext secret values.
+- For GitHub, use a fine-grained PAT scoped to one private repo with `Contents: read/write`.
+- The storage provider receives encrypted vault bytes, not plaintext secret values.
 - Local baseline state stores hashes, not plaintext secrets.
 
 ## Configuring Options
@@ -253,9 +314,9 @@ whichever you prefer.
 
 ### Bind from configuration (recommended)
 
-Pass the `SecretSync` config section. `EncryptionKey` and everything under `S3`
-are bound for you. Only the project mappings stay in code, because they
-reference generated `Projects.*` types:
+Pass the `SecretSync` config section. `EncryptionKey`, `Provider`, and everything
+under `S3` and `GitHub` are bound for you. Only the project mappings stay in code,
+because they reference generated `Projects.*` types:
 
 ```csharp
 var secretSync = builder.Configuration.GetSection("SecretSync");
@@ -270,7 +331,9 @@ await builder.AddSecretSyncAsync(secretSync, options =>
 
 ### Configure everything in code
 
-If you would rather wire each value yourself, use the `configure`-only overload:
+If you would rather wire each value yourself, use the `configure`-only overload.
+
+**S3:**
 
 ```csharp
 var secretSync = builder.Configuration.GetSection("SecretSync");
@@ -293,6 +356,32 @@ await builder.AddSecretSyncAsync(options =>
 });
 ```
 
+**GitHub:**
+
+```csharp
+var secretSync = builder.Configuration.GetSection("SecretSync");
+var github = secretSync.GetSection("GitHub");
+
+await builder.AddSecretSyncAsync(options =>
+{
+    options.Provider = SecretSyncProviderType.GitHub;
+    options.EncryptionKey = secretSync["EncryptionKey"] ?? "";
+
+    options.GitHub.Owner = github["Owner"] ?? "";
+    options.GitHub.Repository = github["Repository"] ?? "";
+    options.GitHub.Branch = github["Branch"] ?? "main";
+    options.GitHub.Token = github["Token"] ?? "";
+    // Optional: custom in-repo path; leave blank to derive the default.
+    options.GitHub.ManifestKey = github["ManifestKey"] ?? "";
+    // Optional: GitHub Enterprise Server only.
+    options.GitHub.ApiBaseUrl = github["ApiBaseUrl"] ?? "";
+
+    options.MapAppHostSecrets("apphost");
+    options.MapProjectUserSecrets<Projects.ApiService>("api");
+    options.MapProjectUserSecrets<Projects.Web>("web");
+});
+```
+
 ### Mix both
 
 With the config-binding overload, `configure` runs *after* the bind, so you can
@@ -308,7 +397,7 @@ await builder.AddSecretSyncAsync(secretSync, options =>
 
 ## API
 
-- `AddSecretSyncAsync(configurationSection, configure)` — binds `EncryptionKey` and `S3` from the config section, then applies the code-only mappings in `configure`.
+- `AddSecretSyncAsync(configurationSection, configure)` — binds `EncryptionKey`, `Provider`, `S3`, and `GitHub` from the config section, then applies the code-only mappings in `configure`.
 - `AddSecretSyncAsync(configure)` — configure every option in code.
 - `AddSecretSync(...)` — synchronous overloads of the above.
 - `MapAppHostSecrets(resourceName)`
