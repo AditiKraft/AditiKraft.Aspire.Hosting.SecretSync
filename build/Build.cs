@@ -23,7 +23,7 @@ class Build : NukeBuild
         SourceDirectory / "AditiKraft.Aspire.Hosting.SecretSync.csproj";
 
     [Parameter("NuGet API Key for publishing templates")] private readonly string NuGetPAT;
-    [Parameter("Package version (default: 0.0.10)")] private readonly string PackageVersion = "0.0.18";
+    [Parameter("Package version (default: 0.0.10)")] private readonly string PackageVersion = "0.0.19";
 
     private AbsolutePath SampleProjectPath =>
         AspireDirectory / "AditiKraft.Aspire.Hosting.SecretSync.AppHost" / "AditiKraft.Aspire.Hosting.SecretSync.AppHost.csproj";
