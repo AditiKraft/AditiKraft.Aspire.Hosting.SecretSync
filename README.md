@@ -6,6 +6,13 @@ Encrypted development secret sync for .NET Aspire AppHost and mapped project use
 
 SecretSync is for teams who want shared development secrets without a separate CLI. Run the Aspire AppHost and it will pull secrets before resources start. Stop the AppHost and it will push local changes back as a new encrypted version.
 
+## Requirements
+
+| Requirement | Version |
+|---|---|
+| .NET SDK | 10.x |
+| Aspire | 13.5+ |
+
 ## Quick Start
 
 Install the package in your AppHost project:
