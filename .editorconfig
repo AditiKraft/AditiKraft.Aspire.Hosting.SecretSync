@@ -751,7 +751,7 @@ dotnet_diagnostic.CA1860.severity = suggestion
 # STYLECOP ANALYZERS
 # ==============================================================================
 # Package referenced in Directory.Build.props (applies to src/ + aspire/, not
-# the isolated Nuke build project).
+# the isolated Fallout build project).
 #
 # Strategy: .editorconfig + dotnet format own formatting / spacing / naming.
 # StyleCop is used ONLY for the structural rules it uniquely adds (member
