@@ -76,13 +76,14 @@ internal sealed class SecretSyncCoordinator(
             remoteManifest.Manifest.LatestRevision,
             payload.ContentHash,
             initializedRemote: false);
+
         SecretSyncConfigurationInjector.AddSyncedSecrets(
             configuration,
             GetAppHostSecrets(),
             options.ConfigurationPrecedence);
 
         remoteState.ContentHash = payload.ContentHash;
-        await PersistUserSecretViewsAsync(mergedVault, remoteState, cancellationToken);
+        await PersistUserSecretViewsAsync(mergedVault, remoteState, configuration, cancellationToken);
     }
 
     public async Task PushAsync(CancellationToken cancellationToken)
@@ -113,7 +114,7 @@ internal sealed class SecretSyncCoordinator(
         SecretSyncRemoteManifest? currentManifest = await GetManifestAsync(cancellationToken);
         if (currentManifest is null)
         {
-            await WriteInitialRemoteAsync(localVault, cancellationToken);
+            await WriteInitialRemoteAsync(localVault, configuration: null, cancellationToken);
             return;
         }
 
@@ -155,6 +156,7 @@ internal sealed class SecretSyncCoordinator(
         await PersistUserSecretViewsAsync(
             localVault,
             CreateRemoteState(nextManifest, manifestWrite.ETag, manifestWrite.WrittenAt),
+            configuration: null,
             cancellationToken);
     }
 
@@ -215,12 +217,13 @@ internal sealed class SecretSyncCoordinator(
             options.PinnedRevision,
             payload.ContentHash,
             initializedRemote: false);
+
         SecretSyncConfigurationInjector.AddSyncedSecrets(
             configuration,
             GetAppHostSecrets(),
             options.ConfigurationPrecedence);
 
-        await PersistUserSecretViewsAsync(payload.Vault, remoteState, cancellationToken);
+        await PersistUserSecretViewsAsync(payload.Vault, remoteState, configuration, cancellationToken);
     }
 
     private async Task InitializeMissingRemoteAsync(
@@ -229,47 +232,32 @@ internal sealed class SecretSyncCoordinator(
         CancellationToken cancellationToken)
     {
         SecretSyncVault localVault = localSnapshot.Vault;
-        if (localVault.IsEmpty)
+        if (localVault.IsEmpty && options.FailWhenRemoteMissingAndLocalEmpty)
         {
-            if (options.FailWhenRemoteMissingAndLocalEmpty)
-            {
-                throw new InvalidOperationException(
-                    "SecretSync remote manifest was not found and no local user secrets were available to initialize it.");
-            }
-
-            handle.Load(
-                localVault,
-                etag: null,
-                revision: null,
-                lastRemoteVaultHash: null,
-                initializedRemote: false);
-            return;
+            throw new InvalidOperationException(
+                "SecretSync remote manifest was not found and no local user secrets were available to initialize it.");
         }
 
-        if (!options.InitializeIfMissing)
-        {
-            handle.Load(
-                localVault,
-                etag: null,
-                revision: null,
-                lastRemoteVaultHash: null,
-                initializedRemote: false);
-            SecretSyncConfigurationInjector.AddSyncedSecrets(
-                configuration,
-                GetAppHostSecrets(),
-                options.ConfigurationPrecedence);
-            return;
-        }
-
-        await WriteInitialRemoteAsync(localVault, cancellationToken);
+        handle.Load(
+            localVault,
+            etag: null,
+            revision: null,
+            lastRemoteVaultHash: null,
+            initializedRemote: false);
         SecretSyncConfigurationInjector.AddSyncedSecrets(
             configuration,
             GetAppHostSecrets(),
             options.ConfigurationPrecedence);
+
+        if (options.InitializeIfMissing && !localVault.IsEmpty)
+        {
+            await WriteInitialRemoteAsync(localVault, configuration, cancellationToken);
+        }
     }
 
     private async Task WriteInitialRemoteAsync(
         SecretSyncVault localVault,
+        IConfiguration? configuration,
         CancellationToken cancellationToken)
     {
         SecretEnvelope envelope = encryptor.Encrypt(localVault, parentRevision: null);
@@ -303,6 +291,7 @@ internal sealed class SecretSyncCoordinator(
         await PersistUserSecretViewsAsync(
             localVault,
             CreateRemoteState(manifest, manifestWrite.ETag, manifestWrite.WrittenAt),
+            configuration,
             cancellationToken);
     }
 
@@ -377,16 +366,18 @@ internal sealed class SecretSyncCoordinator(
     private async Task PersistUserSecretViewsAsync(
         SecretSyncVault vault,
         SecretSyncRemoteState remoteState,
+        IConfiguration? configuration,
         CancellationToken cancellationToken)
     {
         SecretSyncState state = await stateStore.ReadAsync(cancellationToken);
 
         if (options.WriteToUserSecrets)
         {
-            await userSecretsStore.MergeVaultAsync(
+            IReadOnlyList<string> paths = await userSecretsStore.MergeVaultAsync(
                 vault,
                 state.GetResourceHashes(options.AppHostResourceName),
                 cancellationToken);
+            SecretSyncConfigurationInjector.ReloadSecretsFiles(configuration, paths);
         }
 
         await projectUserSecretsStore.MergeVaultAsync(vault, state, cancellationToken);

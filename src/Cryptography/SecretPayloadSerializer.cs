@@ -64,7 +64,7 @@ internal static class SecretPayloadSerializer
             .Replace('+', '-')
             .Replace('/', '_');
 
-    private static JsonNode? CanonicalizeNode(JsonNode? node)
+    internal static JsonNode? CanonicalizeNode(JsonNode? node)
     {
         switch (node)
         {

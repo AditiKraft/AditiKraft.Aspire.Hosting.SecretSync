@@ -8,5 +8,4 @@ internal sealed record SecretSyncLocalSnapshot(
 internal sealed record SecretSyncLocalEdit(
     string ResourceName,
     string Key,
-    string? Value,
     string? BaselineHash);

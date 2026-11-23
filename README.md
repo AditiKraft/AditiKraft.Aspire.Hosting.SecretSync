@@ -6,12 +6,24 @@ Encrypted development secret sync for .NET Aspire AppHost and mapped project use
 
 SecretSync is for teams who want shared development secrets without a separate CLI. Run the Aspire AppHost and it will pull secrets before resources start. Stop the AppHost and it will push local changes back as a new encrypted version.
 
+SecretSync activates during Development AppHost runs. Other environments and Aspire publish or deploy operations use their own Aspire configuration.
+
 ## Requirements
 
 | Requirement | Version |
 |---|---|
-| .NET SDK | 10.x |
-| Aspire | 13.5+ |
+| .NET SDK | 10.0 or later |
+| Aspire | 17.0 or later |
+
+The sample AppHost uses the Aspire 17 CLI bundle.
+
+## Upgrading from Aspire 13.x
+
+Aspire 17 imports existing AppHost .NET user-secrets on the first Development run if its new secrets file does not exist. Use `aspire secret path` to find that file and `aspire secret set` to edit it. Mapped projects continue to use `dotnet user-secrets`. [Aspire secrets documentation](https://aspire.dev/reference/cli/commands/aspire-secret/#environment-specific-secrets)
+
+Keep your AppHost `UserSecretsId` and any configured manifest key to use the same remote vault after upgrading. An explicit `SecretSync:UserSecretsId` still selects that ID's .NET user-secrets file for AppHost sync.
+
+When a synced secret changes or leaves a revision, SecretSync retires matching copies in the paired Aspire and .NET stores. Independent edits in either file are preserved.
 
 ## Quick Start
 
@@ -21,7 +33,7 @@ Install the package in your AppHost project:
 dotnet add package AditiKraft.Aspire.Hosting.SecretSync
 ```
 
-Add bootstrap config to the AppHost user-secrets file. SecretSync supports two
+Add bootstrap config to the Aspire AppHost secrets file. SecretSync supports two
 storage backends — pick the one that fits your team:
 
 | | S3-compatible | GitHub |
@@ -81,6 +93,8 @@ using AditiKraft.Aspire.Hosting.SecretSync;
 using Microsoft.Extensions.Configuration;
 
 var builder = DistributedApplication.CreateBuilder(args);
+var apiProjectPath = Path.GetFullPath("../ApiService/ApiService.csproj", builder.AppHostDirectory);
+var webProjectPath = Path.GetFullPath("../Web/Web.csproj", builder.AppHostDirectory);
 var secretSync = builder.Configuration.GetSection("SecretSync");
 
 if (secretSync.GetValue("Enabled", false))
@@ -88,8 +102,8 @@ if (secretSync.GetValue("Enabled", false))
     await builder.AddSecretSyncAsync(secretSync, options =>
     {
         options.MapAppHostSecrets("apphost");
-        options.MapProjectUserSecrets<Projects.ApiService>("api");
-        options.MapProjectUserSecrets<Projects.Web>("web");
+        options.MapProjectUserSecrets("api", apiProjectPath);
+        options.MapProjectUserSecrets("web", webProjectPath);
 
         // Optional: reduce remote checks during repeated local runs.
         // options.PullMode = SecretSyncPullMode.IfStale;
@@ -102,21 +116,21 @@ if (secretSync.GetValue("Enabled", false))
     });
 }
 
-var api = builder.AddProject<Projects.ApiService>("api");
+var api = builder.AddDotnetProject("api", apiProjectPath);
 
-builder.AddProject<Projects.Web>("web")
+builder.AddDotnetProject("web", webProjectPath)
     .WithReference(api);
 
 builder.Build().Run();
 ```
 
-That is enough for the normal case. By default SecretSync pulls on startup, writes local user-secrets, and pushes local changes on shutdown.
+`AddDotnetProject` is provided by `Aspire.Hosting.Dotnet`. By default SecretSync pulls on startup and pushes local changes on graceful shutdown.
 
 ## Where Secrets Go
 
 The `SecretSync` section is control config only. It is not synced as app secret data.
 
-Everything outside `SecretSync` in the AppHost user-secrets file becomes the AppHost resource:
+Everything outside `SecretSync` in the Aspire AppHost secrets file becomes the AppHost resource. Values retain their JSON types in the encrypted vault and when restored on another machine:
 
 ```json
 {
@@ -166,7 +180,7 @@ Mapped .NET projects do not need any extra `.With...` call. SecretSync writes ea
 First machine:
 
 1. Add SecretSync bootstrap config.
-2. Keep existing AppHost/API/Web development secrets in normal user-secrets files.
+2. Keep development secrets in the Aspire AppHost store and each mapped project's .NET user-secrets file.
 3. Run the AppHost.
 4. If remote storage is empty, SecretSync creates the first encrypted version.
 
@@ -179,7 +193,7 @@ New machine:
 Normal development:
 
 1. Startup pulls and hydrates local user-secrets.
-2. You edit AppHost or project user-secrets normally.
+2. Edit AppHost secrets with `aspire secret set` or project user-secrets with `dotnet user-secrets`.
 3. Shutdown pushes a new encrypted version if values changed.
 
 > [!IMPORTANT]
@@ -304,6 +318,8 @@ Available modes:
 - `PushWins`: prefer local values.
 - `MergeNonOverlapping`: merge only non-conflicting changes.
 
+Arrays are merged as a single value, including when an older vault stores their entries as indexed keys.
+
 ## Security Notes
 
 - Do not commit `SecretSync:EncryptionKey`.
@@ -322,8 +338,8 @@ whichever you prefer.
 ### Bind from configuration (recommended)
 
 Pass the `SecretSync` config section. `EncryptionKey`, `Provider`, and everything
-under `S3` and `GitHub` are bound for you. Only the project mappings stay in code,
-because they reference generated `Projects.*` types:
+under `S3` and `GitHub` are bound for you. Use the project paths from Quick Start
+to map project user-secrets in code.
 
 ```csharp
 var secretSync = builder.Configuration.GetSection("SecretSync");
@@ -331,8 +347,8 @@ var secretSync = builder.Configuration.GetSection("SecretSync");
 await builder.AddSecretSyncAsync(secretSync, options =>
 {
     options.MapAppHostSecrets("apphost");
-    options.MapProjectUserSecrets<Projects.ApiService>("api");
-    options.MapProjectUserSecrets<Projects.Web>("web");
+    options.MapProjectUserSecrets("api", apiProjectPath);
+    options.MapProjectUserSecrets("web", webProjectPath);
 });
 ```
 
@@ -358,8 +374,8 @@ await builder.AddSecretSyncAsync(options =>
     options.S3.Region = s3["Region"] ?? "us-east-1";
 
     options.MapAppHostSecrets("apphost");
-    options.MapProjectUserSecrets<Projects.ApiService>("api");
-    options.MapProjectUserSecrets<Projects.Web>("web");
+    options.MapProjectUserSecrets("api", apiProjectPath);
+    options.MapProjectUserSecrets("web", webProjectPath);
 });
 ```
 
@@ -384,8 +400,8 @@ await builder.AddSecretSyncAsync(options =>
     options.GitHub.ApiBaseUrl = github["ApiBaseUrl"] ?? "";
 
     options.MapAppHostSecrets("apphost");
-    options.MapProjectUserSecrets<Projects.ApiService>("api");
-    options.MapProjectUserSecrets<Projects.Web>("web");
+    options.MapProjectUserSecrets("api", apiProjectPath);
+    options.MapProjectUserSecrets("web", webProjectPath);
 });
 ```
 

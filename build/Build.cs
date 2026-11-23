@@ -15,7 +15,6 @@ class Build : FalloutBuild
     [Solution] readonly Solution Solution;
 
     AbsolutePath SourceDirectory => RootDirectory / "src";
-    AbsolutePath AspireDirectory => RootDirectory / "aspire";
     AbsolutePath ArtifactsDirectory => RootDirectory / "artifacts";
     AbsolutePath PackageOutputDirectory => ArtifactsDirectory / "Packages";
 
@@ -23,10 +22,7 @@ class Build : FalloutBuild
         SourceDirectory / "AditiKraft.Aspire.Hosting.SecretSync.csproj";
 
     [Parameter("NuGet API Key for publishing templates")] private readonly string NuGetPAT;
-    [Parameter("Package version (default: 0.1.0)")] private readonly string PackageVersion = "0.1.0";
-
-    private AbsolutePath SampleProjectPath =>
-        AspireDirectory / "AditiKraft.Aspire.Hosting.SecretSync.AppHost" / "AditiKraft.Aspire.Hosting.SecretSync.AppHost.csproj";
+    [Parameter("Package version (default: 0.2.0)")] private readonly string PackageVersion = "0.2.0";
 
     #region NuGet
 
@@ -53,7 +49,7 @@ class Build : FalloutBuild
         .Executes(() =>
         {
             DotNetTasks.DotNetBuild(s => s
-                .SetProjectFile(SampleProjectPath)
+                .SetProjectFile(Solution)
                 .SetConfiguration(Configuration)
                 .SetProperty("Version", PackageVersion)
                 .SetProperty("AssemblyVersion", PackageVersion)

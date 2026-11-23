@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using AditiKraft.Aspire.Hosting.SecretSync.Configuration;
 
 namespace AditiKraft.Aspire.Hosting.SecretSync.State;
@@ -39,12 +40,12 @@ internal sealed class SecretSyncStateStore(SecretSyncOptions options)
             state.Remote = remote;
         }
 
-        foreach ((string resourceName, System.Text.Json.Nodes.JsonObject resource) in vault.Resources)
+        foreach ((string resourceName, JsonObject resource) in vault.Resources)
         {
             Dictionary<string, string> hashes = new(StringComparer.OrdinalIgnoreCase);
-            foreach ((string key, string? value) in VaultFlattener.Flatten(resource))
+            foreach ((string key, JsonNode? value) in VaultFlattener.FlattenValues(resource))
             {
-                hashes[key] = SecretValueHasher.Hash(value);
+                hashes[key] = SecretValueHasher.HashValue(value);
             }
 
             state.Resources[resourceName] = hashes;

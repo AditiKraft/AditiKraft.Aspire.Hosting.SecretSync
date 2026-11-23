@@ -60,19 +60,21 @@ internal static class SecretSyncVaultMerger
         string resourceName,
         IReadOnlyDictionary<string, SecretSyncLocalEdit> localEditIndex)
     {
-        Dictionary<string, string?> remoteValues = VaultFlattener.Flatten(remote);
-        Dictionary<string, string?> localValues = VaultFlattener.Flatten(local);
-        Dictionary<string, string?> merged = new(remoteValues, StringComparer.OrdinalIgnoreCase);
+        Dictionary<string, JsonNode?> remoteValues = VaultFlattener.FlattenValues(remote);
+        Dictionary<string, JsonNode?> localValues = VaultFlattener.FlattenValues(local);
+        ResolveIndexedArrays(remoteValues, localValues, SecretSyncConflictMode.PullWins, conflictMode, area);
+        ResolveIndexedArrays(localValues, remoteValues, SecretSyncConflictMode.PushWins, conflictMode, area);
+        Dictionary<string, JsonNode?> merged = new(remoteValues, StringComparer.OrdinalIgnoreCase);
 
-        foreach ((string key, string? localValue) in localValues)
+        foreach ((string key, JsonNode? localValue) in localValues)
         {
-            if (!remoteValues.TryGetValue(key, out string? remoteValue))
+            if (!remoteValues.TryGetValue(key, out JsonNode? remoteValue))
             {
                 merged[key] = localValue;
                 continue;
             }
 
-            if (string.Equals(remoteValue, localValue, StringComparison.Ordinal))
+            if (JsonNode.DeepEquals(remoteValue, localValue))
             {
                 merged[key] = localValue;
                 continue;
@@ -96,6 +98,48 @@ internal static class SecretSyncVaultMerger
         return VaultFlattener.Unflatten(merged);
     }
 
+    private static void ResolveIndexedArrays(
+        Dictionary<string, JsonNode?> arrayValues,
+        Dictionary<string, JsonNode?> indexedValues,
+        SecretSyncConflictMode arrayWinsMode,
+        SecretSyncConflictMode conflictMode,
+        string area)
+    {
+        foreach ((string key, JsonNode? value) in arrayValues.ToArray())
+        {
+            if (value is not JsonArray array)
+            {
+                continue;
+            }
+
+            string[] indexKeys = VaultFlattener.GetArrayIndexKeys(key, indexedValues.Keys);
+            if (indexKeys.Length == 0)
+            {
+                continue;
+            }
+
+            Dictionary<string, string?> projection = VaultFlattener.FlattenArray(key, array);
+            bool equivalent = indexKeys.Length == projection.Count && indexKeys.All(indexKey =>
+                projection.TryGetValue(indexKey, out string? text) && JsonNode.DeepEquals(indexedValues[indexKey], JsonValue.Create(text)));
+            if (equivalent || conflictMode == arrayWinsMode)
+            {
+                foreach (string indexKey in indexKeys)
+                {
+                    indexedValues.Remove(indexKey);
+                }
+            }
+            else if (conflictMode is SecretSyncConflictMode.PullWins or SecretSyncConflictMode.PushWins)
+            {
+                arrayValues.Remove(key);
+            }
+            else
+            {
+                throw new SecretSyncConflictException(
+                    $"SecretSync conflict in {area} for array '{key}'. Resolve the local array or choose PullWins/PushWins explicitly.");
+            }
+        }
+    }
+
     private static Dictionary<string, SecretSyncLocalEdit> CreateLocalEditIndex(
         IReadOnlyList<SecretSyncLocalEdit>? localEdits)
     {
@@ -116,7 +160,7 @@ internal static class SecretSyncVaultMerger
     private static bool IsSafeLocalEdit(
         string resourceName,
         string key,
-        string? remoteValue,
+        JsonNode? remoteValue,
         IReadOnlyDictionary<string, SecretSyncLocalEdit> localEditIndex)
     {
         if (!localEditIndex.TryGetValue(CreateLocalEditIndexKey(resourceName, key), out SecretSyncLocalEdit? edit) ||
@@ -125,10 +169,7 @@ internal static class SecretSyncVaultMerger
             return false;
         }
 
-        return string.Equals(
-            edit.BaselineHash,
-            SecretValueHasher.Hash(remoteValue),
-            StringComparison.Ordinal);
+        return SecretValueHasher.Matches(edit.BaselineHash, remoteValue);
     }
 
     private static string CreateLocalEditIndexKey(string resourceName, string key) =>

@@ -30,7 +30,7 @@ public sealed class VaultFlattenerTests
     [Fact]
     public void Unflatten_RestoresNestedJson()
     {
-        Dictionary<string, string?> values = new()
+        Dictionary<string, JsonNode?> values = new()
         {
             ["Stripe:ApiKey"] = "sk_api",
             ["Auth:Google:ClientSecret"] = "secret"
