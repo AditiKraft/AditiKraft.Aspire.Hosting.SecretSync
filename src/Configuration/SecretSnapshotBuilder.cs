@@ -1,3 +1,4 @@
+using System.Text.Json.Nodes;
 using AditiKraft.Aspire.Hosting.SecretSync.State;
 using AditiKraft.Aspire.Hosting.SecretSync.UserSecrets;
 
@@ -29,7 +30,7 @@ internal sealed class SecretSnapshotBuilder(
 
         if (options.ReadFromUserSecrets)
         {
-            IReadOnlyDictionary<string, string?> secrets = await userSecretsStore.ReadAsync(cancellationToken);
+            IReadOnlyDictionary<string, JsonNode?> secrets = await userSecretsStore.ReadAsync(cancellationToken);
             UserSecretsReadResult appHost = UserSecretsMaterializer.ReadResource(
                 options.AppHostResourceName,
                 secrets,
@@ -46,17 +47,17 @@ internal sealed class SecretSnapshotBuilder(
 
         ProjectUserSecretsReadResult projectSecrets =
             await projectUserSecretsStore.ReadResourceChangesAsync(state, cancellationToken);
-        foreach ((string resourceName, Dictionary<string, string?> values) in projectSecrets.Resources)
+        foreach ((string resourceName, Dictionary<string, JsonNode?> values) in projectSecrets.Resources)
         {
             if (values.Count == 0)
             {
                 continue;
             }
 
-            if (vault.Resources.TryGetValue(resourceName, out System.Text.Json.Nodes.JsonObject? existing))
+            if (vault.Resources.TryGetValue(resourceName, out JsonObject? existing))
             {
-                Dictionary<string, string?> merged = VaultFlattener.Flatten(existing);
-                foreach ((string key, string? value) in values)
+                Dictionary<string, JsonNode?> merged = VaultFlattener.FlattenValues(existing);
+                foreach ((string key, JsonNode? value) in values)
                 {
                     merged[key] = value;
                 }
@@ -80,17 +81,17 @@ internal sealed class SecretSnapshotBuilder(
 
         if (options.ReadFromUserSecrets)
         {
-            IReadOnlyDictionary<string, string?> secrets = await userSecretsStore.ReadAsync(cancellationToken);
-            Dictionary<string, string?> appHost = UserSecretsMaterializer.ReadResourceValues(secrets);
+            IReadOnlyDictionary<string, JsonNode?> secrets = await userSecretsStore.ReadAsync(cancellationToken);
+            Dictionary<string, JsonNode?> appHost = UserSecretsMaterializer.ReadResourceValues(secrets);
             if (appHost.Count > 0)
             {
                 vault.Resources[options.AppHostResourceName] = VaultFlattener.Unflatten(appHost);
             }
         }
 
-        IReadOnlyDictionary<string, Dictionary<string, string?>> projectResources =
+        IReadOnlyDictionary<string, Dictionary<string, JsonNode?>> projectResources =
             await projectUserSecretsStore.ReadAllResourcesAsync(cancellationToken);
-        foreach ((string resourceName, Dictionary<string, string?> values) in projectResources)
+        foreach ((string resourceName, Dictionary<string, JsonNode?> values) in projectResources)
         {
             if (values.Count > 0)
             {

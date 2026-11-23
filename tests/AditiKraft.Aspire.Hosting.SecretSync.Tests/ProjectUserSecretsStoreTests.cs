@@ -20,8 +20,7 @@ public sealed class ProjectUserSecretsStoreTests : IDisposable
         SecretSyncOptions options = new();
         options.MapProjectUserSecrets("api", projectPath);
 
-        UserSecretsStore userSecretsStore = new(options);
-        ProjectUserSecretsStore projectStore = new(options, userSecretsStore);
+        ProjectUserSecretsStore projectStore = new(options);
 
         SecretSyncVault vault = new()
         {
@@ -43,25 +42,25 @@ public sealed class ProjectUserSecretsStoreTests : IDisposable
         SecretSyncState emptyState = new();
         await projectStore.MergeVaultAsync(vault, emptyState, CancellationToken.None);
 
-        IReadOnlyDictionary<string, string?> values =
+        IReadOnlyDictionary<string, JsonNode?> values =
             await UserSecretsStore.ReadAsync(userSecretsId, CancellationToken.None);
 
-        Assert.Equal("sk-api", values["Stripe:ApiKey"]);
-        Assert.Equal("api", values["Stripe:Mode"]);
+        Assert.Equal("sk-api", values["Stripe:ApiKey"]?.GetValue<string>());
+        Assert.Equal("api", values["Stripe:Mode"]?.GetValue<string>());
         Assert.False(values.ContainsKey("Parameters:postgres-password"));
-        Assert.DoesNotContain("sk-web", values.Values);
+        Assert.DoesNotContain(values.Values, value => value?.GetValue<string>() == "sk-web");
 
         SecretSyncState baselineState = CreateState(vault);
         ProjectUserSecretsReadResult read = await projectStore.ReadResourceChangesAsync(
             baselineState,
             CancellationToken.None);
 
-        Assert.True(read.Resources.TryGetValue("api", out Dictionary<string, string?>? apiResource));
+        Assert.True(read.Resources.TryGetValue("api", out Dictionary<string, JsonNode?>? apiResource));
         Assert.Empty(apiResource);
 
         await UserSecretsStore.MergeAsync(
             userSecretsId,
-            new Dictionary<string, string?> { ["Stripe:ApiKey"] = "sk-api-local-edit" },
+            new Dictionary<string, JsonNode?> { ["Stripe:ApiKey"] = "sk-api-local-edit" },
             overwriteExisting: true,
             CancellationToken.None);
 
@@ -69,7 +68,7 @@ public sealed class ProjectUserSecretsStoreTests : IDisposable
             baselineState,
             CancellationToken.None);
 
-        Assert.Equal("sk-api-local-edit", read.Resources["api"]["Stripe:ApiKey"]);
+        Assert.Equal("sk-api-local-edit", read.Resources["api"]["Stripe:ApiKey"]?.GetValue<string>());
         Assert.Single(read.Edits);
         Assert.Equal("api", read.Edits[0].ResourceName);
     }
@@ -91,8 +90,8 @@ public sealed class ProjectUserSecretsStoreTests : IDisposable
         };
         options.MapProjectUserSecrets("api", projectPath);
 
-        UserSecretsStore userSecretsStore = new(options);
-        ProjectUserSecretsStore projectStore = new(options, userSecretsStore);
+        UserSecretsStore userSecretsStore = new(options, appHostSecretsPath: null);
+        ProjectUserSecretsStore projectStore = new(options);
         SecretSyncStateStore stateStore = new(options);
         SecretSnapshotBuilder snapshotBuilder = new(options, userSecretsStore, projectStore, stateStore);
 
@@ -106,7 +105,7 @@ public sealed class ProjectUserSecretsStoreTests : IDisposable
 
         await UserSecretsStore.WriteAsync(
             userSecretsId,
-            new Dictionary<string, string?>
+            new Dictionary<string, JsonNode?>
             {
                 ["Stripe:ApiKey"] = "sk-api"
             },

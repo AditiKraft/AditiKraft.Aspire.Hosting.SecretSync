@@ -56,15 +56,21 @@ public static class SecretSyncExtensions
         ArgumentNullException.ThrowIfNull(builder);
         ArgumentNullException.ThrowIfNull(configure);
 
+        SecretSyncHandle handle = new();
+        if (!builder.Environment.IsDevelopment() || !builder.ExecutionContext.IsRunMode)
+        {
+            return handle;
+        }
+
         SecretSyncOptions options = new();
         configure(options);
+        bool hasExplicitUserSecretsId = !string.IsNullOrWhiteSpace(options.UserSecretsId);
         ResolveAppHostDefaults(builder, options);
+        UserSecretsStore userSecretsStore = CreateAppHostSecretsStore(builder, options, hasExplicitUserSecretsId);
 
-        SecretSyncHandle handle = new();
         ISecretSyncProvider provider = CreateProvider(options);
         AesGcmSecretEncryptor encryptor = new(options);
-        UserSecretsStore userSecretsStore = new(options);
-        ProjectUserSecretsStore projectUserSecretsStore = new(options, userSecretsStore);
+        ProjectUserSecretsStore projectUserSecretsStore = new(options);
         SecretSyncStateStore stateStore = new(options);
         SecretSnapshotBuilder snapshotBuilder = new(options, userSecretsStore, projectUserSecretsStore, stateStore);
         SecretSyncCoordinator coordinator = new(
@@ -112,6 +118,28 @@ public static class SecretSyncExtensions
             SecretSyncProviderType.GitHub => new GitHubSecretSyncProvider(),
             _ => new S3SecretSyncProvider()
         };
+
+    private static UserSecretsStore CreateAppHostSecretsStore(
+        IDistributedApplicationBuilder builder,
+        SecretSyncOptions options,
+        bool hasExplicitUserSecretsId)
+    {
+        IUserSecretsManager secretsManager = builder.UserSecretsManager;
+        string? aspirePath = secretsManager.IsAvailable ? secretsManager.FilePath : null;
+        string? importedUserSecretsPath = aspirePath is null
+            ? null
+            : SecretSyncConfigurationInjector.FindLegacySecretsPath(builder.Configuration, aspirePath);
+        if (hasExplicitUserSecretsId)
+        {
+            string? legacyPath = UserSecretsStore.GetLegacySecretsPath(options.UserSecretsId);
+            string? importedAspirePath = SecretSyncConfigurationInjector.PathsEqual(legacyPath, importedUserSecretsPath)
+                ? aspirePath
+                : null;
+            return new UserSecretsStore(options, legacyPath, importedAspirePath);
+        }
+
+        return new UserSecretsStore(options, aspirePath, importedUserSecretsPath);
+    }
 
     private static void ResolveAppHostDefaults(IDistributedApplicationBuilder builder, SecretSyncOptions options)
     {

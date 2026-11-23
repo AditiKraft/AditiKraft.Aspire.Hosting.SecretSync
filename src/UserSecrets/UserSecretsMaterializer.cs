@@ -1,3 +1,4 @@
+using System.Text.Json.Nodes;
 using AditiKraft.Aspire.Hosting.SecretSync.Configuration;
 
 namespace AditiKraft.Aspire.Hosting.SecretSync.UserSecrets;
@@ -5,18 +6,19 @@ namespace AditiKraft.Aspire.Hosting.SecretSync.UserSecrets;
 internal static class UserSecretsMaterializer
 {
     public static bool IsControlKey(string key) =>
+        key.Equals("SecretSync", StringComparison.OrdinalIgnoreCase) ||
         key.StartsWith("SecretSync:", StringComparison.OrdinalIgnoreCase);
 
     public static UserSecretsReadResult ReadResource(
         string resourceName,
-        IReadOnlyDictionary<string, string?> values,
+        IReadOnlyDictionary<string, JsonNode?> values,
         IReadOnlyDictionary<string, string> baselineHashes)
     {
-        Dictionary<string, string?> resource = new(StringComparer.OrdinalIgnoreCase);
+        Dictionary<string, JsonNode?> resource = new(StringComparer.OrdinalIgnoreCase);
         List<SecretSyncLocalEdit> edits = [];
         HashSet<string> currentKeys = new(StringComparer.OrdinalIgnoreCase);
 
-        foreach ((string key, string? value) in values)
+        foreach ((string key, JsonNode? value) in values)
         {
             if (IsControlKey(key))
             {
@@ -25,26 +27,24 @@ internal static class UserSecretsMaterializer
 
             currentKeys.Add(key);
             baselineHashes.TryGetValue(key, out string? baselineHash);
-            if (baselineHash is not null &&
-                string.Equals(baselineHash, SecretValueHasher.Hash(value), StringComparison.Ordinal))
+            if (baselineHash is not null && SecretValueHasher.Matches(baselineHash, value))
             {
                 continue;
             }
 
             resource[key] = value;
-            edits.Add(new SecretSyncLocalEdit(resourceName, key, value, baselineHash));
+            edits.Add(new SecretSyncLocalEdit(resourceName, key, baselineHash));
         }
 
         bool hasMissingBaselineValues = baselineHashes.Keys.Any(key => !currentKeys.Contains(key));
         return new UserSecretsReadResult(resource, edits, hasMissingBaselineValues);
     }
 
-    public static Dictionary<string, string?> ReadResourceValues(
-        IReadOnlyDictionary<string, string?> values)
+    public static Dictionary<string, JsonNode?> ReadResourceValues(IReadOnlyDictionary<string, JsonNode?> values)
     {
-        Dictionary<string, string?> resource = new(StringComparer.OrdinalIgnoreCase);
+        Dictionary<string, JsonNode?> resource = new(StringComparer.OrdinalIgnoreCase);
 
-        foreach ((string key, string? value) in values)
+        foreach ((string key, JsonNode? value) in values)
         {
             if (!IsControlKey(key))
             {
@@ -56,26 +56,44 @@ internal static class UserSecretsMaterializer
     }
 
     public static void Materialize(
-        Dictionary<string, string?> current,
-        IReadOnlyDictionary<string, string?> resourceValues,
+        Dictionary<string, JsonNode?> current,
+        IReadOnlyDictionary<string, JsonNode?> resourceValues,
         IReadOnlyDictionary<string, string> baselineHashes)
     {
-        HashSet<string> resourceKeys = new(resourceValues.Keys, StringComparer.OrdinalIgnoreCase);
-
-        foreach ((string key, string? value) in resourceValues)
+        foreach ((string key, JsonNode? value) in resourceValues)
         {
-            current[key] = value;
+            if (!IsControlKey(key))
+            {
+                if (value is JsonArray)
+                {
+                    foreach (string indexKey in VaultFlattener.GetArrayIndexKeys(key, current.Keys))
+                    {
+                        current.Remove(indexKey);
+                    }
+                }
+
+                current[key] = value;
+            }
+        }
+
+        foreach ((string key, JsonNode? value) in current.ToArray())
+        {
+            if (value is JsonArray && !IsControlKey(key) && !resourceValues.ContainsKey(key) &&
+                VaultFlattener.GetArrayIndexKeys(key, resourceValues.Keys).Length > 0)
+            {
+                // A selected legacy revision supplies the entire indexed representation.
+                current.Remove(key);
+            }
         }
 
         foreach ((string key, string hash) in baselineHashes)
         {
-            if (resourceKeys.Contains(key))
+            if (IsControlKey(key) || resourceValues.ContainsKey(key))
             {
                 continue;
             }
 
-            if (current.TryGetValue(key, out string? currentValue) &&
-                string.Equals(hash, SecretValueHasher.Hash(currentValue), StringComparison.Ordinal))
+            if (current.TryGetValue(key, out JsonNode? currentValue) && SecretValueHasher.Matches(hash, currentValue))
             {
                 current.Remove(key);
             }
@@ -84,6 +102,6 @@ internal static class UserSecretsMaterializer
 }
 
 internal sealed record UserSecretsReadResult(
-    IReadOnlyDictionary<string, string?> Resource,
+    IReadOnlyDictionary<string, JsonNode?> Resource,
     IReadOnlyList<SecretSyncLocalEdit> Edits,
     bool HasMissingBaselineValues);
